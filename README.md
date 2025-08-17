@@ -1,4 +1,4 @@
-# @germankuber/react-speech-to-text
+# react-speech-to-text-gk
 
 [![npm version](https://badge.fury.io/js/@germankuber%2Freact-speech-to-text.svg)](https://badge.fury.io/js/@germankuber%2Freact-speech-to-text)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg)](https://www.typescriptlang.org/)
@@ -71,7 +71,7 @@ Try the interactive demo to see all features in action:
 ### Basic Speech Recognition
 
 ```tsx
-import { useSpeechToText } from '@germankuber/react-speech-to-text';
+import { useSpeechToText } from 'react-speech-to-text-gk';
 
 function App() {
   const { isListening, transcript, toggleListening } = useSpeechToText();
@@ -90,7 +90,7 @@ function App() {
 ### With Real-time Audio Metrics
 
 ```tsx
-import { useSpeechToText, PerformanceMode } from '@germankuber/react-speech-to-text';
+import { useSpeechToText, PerformanceMode } from 'react-speech-to-text-gk';
 
 function VoiceAnalyzer() {
   const {
@@ -437,7 +437,7 @@ import {
   // Utility types
   generateSessionMetadata,
   generateChartData
-} from '@germankuber/react-speech-to-text';
+} from 'react-speech-to-text-gk';
 ```
 
 ## 🎯 Use Cases

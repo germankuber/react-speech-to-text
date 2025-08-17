@@ -1,6 +1,6 @@
 # React Speech-to-Text Example
 
-This is a demo application showing how to use `@germankuber/react-speech-to-text` library.
+This is a demo application showing how to use `react-speech-to-text-gk` library.
 
 ## Getting Started
 
@@ -30,12 +30,12 @@ npm start
 This example uses direct imports from the source code for development purposes. When using the published package in your project:
 
 ```bash
-npm install @germankuber/react-speech-to-text
+npm install react-speech-to-text-gk
 ```
 
 Import and use:
 ```tsx
-import { useSpeechToText, PerformanceMode } from '@germankuber/react-speech-to-text';
+import { useSpeechToText, PerformanceMode } from 'react-speech-to-text-gk';
 
 function MyComponent() {
   const { isListening, transcript, toggleListening } = useSpeechToText({

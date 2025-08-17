@@ -2,7 +2,7 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@germankuber/react-speech-to-text/*": ["src/*"]
+      "react-speech-to-text-gk/*": ["src/*"]
     }
   }
 }
