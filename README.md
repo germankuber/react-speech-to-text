@@ -50,13 +50,13 @@ Perfect for building voice-controlled applications, transcription tools, audio a
 
 ```bash
 # npm
-npm install @germankuber/react-speech-to-text
+npm install react-speech-to-text-gk
 
 # yarn
-yarn add @germankuber/react-speech-to-text
+yarn add react-speech-to-text-gk
 
 # pnpm
-pnpm add @germankuber/react-speech-to-text
+pnpm add react-speech-to-text-gk
 ```
 
 ## 🎮 Live Demo
