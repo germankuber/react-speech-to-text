@@ -22,6 +22,8 @@ interface UseSpeechToTextReturn {
   audioMetrics: AudioMetrics;
   chartData: ChartData;
   toggleListening: () => Promise<void>;
+  startListening: () => Promise<void>;
+  stopListening: () => Promise<void>;
   clearTranscript: () => void;
   copyMetadataToClipboard: () => Promise<{ success: boolean; message: string }>;
 }
@@ -265,6 +267,47 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
     }
   }, [isListening, stopAudioAnalysis, generateMetadata, initializeAudioAnalysis, audioConfig]);
 
+  const startListening = useCallback(async () => {
+    if (!recognitionRef.current || isListening) return;
+
+    setSilenceDetected(false);
+    setSessionMetadata(null);
+    currentWordsRef.current.length = 0;
+    lastSpeechTimeRef.current = Date.now();
+    
+    try {
+      await initializeAudioAnalysis(audioConfig);
+      recognitionRef.current.start();
+      
+      uiUpdateIntervalRef.current = setInterval(() => {
+        if (isListening) {
+          forceUpdate(prev => prev + 1);
+        }
+      }, 100);
+      
+    } catch (error) {
+      console.error('Error starting speech recognition:', error);
+      setIsListening(false);
+      setSilenceDetected(false);
+    }
+  }, [isListening, initializeAudioAnalysis, audioConfig]);
+
+  const stopListening = useCallback(async () => {
+    if (!recognitionRef.current || !isListening) return;
+
+    recognitionRef.current.stop();
+    
+    if (uiUpdateIntervalRef.current) {
+      clearInterval(uiUpdateIntervalRef.current);
+      uiUpdateIntervalRef.current = null;
+    }
+    
+    setTimeout(() => {
+      stopAudioAnalysis();
+      setSessionMetadata(generateMetadata());
+    }, 100);
+  }, [isListening, stopAudioAnalysis, generateMetadata]);
+
   const clearTranscript = useCallback(() => {
     setTranscript('');
     setInterimTranscript('');
@@ -307,6 +350,8 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
     audioMetrics,
     chartData,
     toggleListening,
+    startListening,
+    stopListening,
     clearTranscript,
     copyMetadataToClipboard
   };
