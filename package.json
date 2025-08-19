@@ -1,6 +1,6 @@
 {
   "name": "react-speech-to-text-gk",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Advanced React speech-to-text library with real-time audio analysis and comprehensive speech metrics",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
