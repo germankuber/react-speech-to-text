@@ -7,7 +7,8 @@ import {
   SessionMetadata,
   AudioMetrics,
   ChartData,
-  PerformanceMode
+  PerformanceMode,
+  SilenceDetectedData
 } from '../types/speechToText';
 import { useAudioAnalysis } from './useAudioAnalysis';
 import { generateSessionMetadata, generateChartData } from '../utils/speechToTextUtils';
@@ -34,7 +35,8 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
     silenceTimeout = 700,
     optimizedMode = true,
     performanceMode = PerformanceMode.BALANCED,
-    audioConfig = {}
+    audioConfig = {},
+    onSilenceDetected
   } = config;
 
   const [isListening, setIsListening] = useState(false);
@@ -50,6 +52,8 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
   const lastSpeechTimeRef = useRef<number>(0);
   const currentWordsRef = useRef<string[]>([]);
   const uiUpdateIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const transcriptRef = useRef<string>('');
+  const interimTranscriptRef = useRef<string>('');
 
   const {
     initializeAudioAnalysis,
@@ -98,7 +102,24 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
       
       // Set new silence timer
       silenceTimerRef.current = setTimeout(() => {
+        const silenceDetectedAt = Date.now();
+        const timeSinceLastSpeech = silenceDetectedAt - lastSpeechTimeRef.current;
+        
         setSilenceDetected(true);
+        
+        // Call the onSilenceDetected callback if provided
+        if (onSilenceDetected) {
+          const silenceData: SilenceDetectedData = {
+            silenceDetectedAt,
+            silenceTimeout,
+            timeSinceLastSpeech,
+            currentTranscript: transcriptRef.current,
+            currentInterimTranscript: interimTranscriptRef.current,
+            currentAudioMetrics: getAudioData()
+          };
+          onSilenceDetected(silenceData);
+        }
+        
         if (recognitionRef.current) {
           recognitionRef.current.stop();
           
@@ -118,7 +139,11 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
     }
 
     if (finalTranscript) {
-      setTranscript(prev => prev + finalTranscript);
+      setTranscript(prev => {
+        const newTranscript = prev + finalTranscript;
+        transcriptRef.current = newTranscript;
+        return newTranscript;
+      });
       // Optimized word extraction
       const newWords = finalTranscript.trim().split(wordSplitRegex).filter(Boolean);
       if (newWords.length > 0) {
@@ -127,7 +152,8 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
     }
     
     setInterimTranscript(interimTranscript);
-  }, [silenceTimeout, stopAudioAnalysis, generateMetadata, wordSplitRegex]);
+    interimTranscriptRef.current = interimTranscript;
+  }, [silenceTimeout, stopAudioAnalysis, generateMetadata, wordSplitRegex, onSilenceDetected, getAudioData]);
 
   // Initialize speech recognition with optimized configuration
   useEffect(() => {
@@ -245,6 +271,8 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
       setSilenceDetected(false);
       setSessionMetadata(null);
       currentWordsRef.current.length = 0; // Efficient array clearing
+      transcriptRef.current = '';
+      interimTranscriptRef.current = '';
       lastSpeechTimeRef.current = Date.now();
       
       try {
@@ -273,6 +301,8 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
     setSilenceDetected(false);
     setSessionMetadata(null);
     currentWordsRef.current.length = 0;
+    transcriptRef.current = '';
+    interimTranscriptRef.current = '';
     lastSpeechTimeRef.current = Date.now();
     
     try {
@@ -311,6 +341,8 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
   const clearTranscript = useCallback(() => {
     setTranscript('');
     setInterimTranscript('');
+    transcriptRef.current = '';
+    interimTranscriptRef.current = '';
     setSilenceDetected(false);
     setSessionMetadata(null);
     currentWordsRef.current.length = 0; // Efficient array clearing

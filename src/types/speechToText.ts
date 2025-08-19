@@ -167,6 +167,12 @@ export interface SpeechToTextConfig {
      */
     autoGainControl?: boolean;
   };
+  
+  /**
+   * Callback function triggered when silence is detected
+   * Provides detailed information about the silence event and current state
+   */
+  onSilenceDetected?: (data: SilenceDetectedData) => void;
 }
 
 /**
@@ -197,4 +203,22 @@ export interface ChartData {
   pitchData: { time: number; averagePitch: number }[];
   /** Speech rate data calculated from word timing */
   speechRateData: { time: number; wpm: number }[];
+}
+
+/**
+ * Data provided when silence is detected
+ */
+export interface SilenceDetectedData {
+  /** Timestamp when silence was detected (milliseconds since epoch) */
+  silenceDetectedAt: number;
+  /** Duration of the silence timeout in milliseconds */
+  silenceTimeout: number;
+  /** Total duration since last speech activity in milliseconds */
+  timeSinceLastSpeech: number;
+  /** Current transcript at the time of silence detection */
+  currentTranscript: string;
+  /** Current interim transcript at the time of silence detection */
+  currentInterimTranscript: string;
+  /** Current audio metrics at the time of silence detection */
+  currentAudioMetrics: AudioMetrics;
 }
