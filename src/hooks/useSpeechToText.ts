@@ -215,7 +215,35 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
     };
 
     const handleError = (event: SpeechRecognitionErrorEvent) => {
-      console.error('Speech recognition error:', event.error);
+      // Handle specific error types
+      switch (event.error) {
+        case 'no-speech':
+          // This is normal behavior when no speech is detected for ~5 seconds
+          // Don't log as error, just restart recognition if still listening
+          if (isListening && recognitionRef.current) {
+            try {
+              recognitionRef.current.start();
+            } catch (e) {
+              // If restart fails, then stop listening
+              setIsListening(false);
+              setInterimTranscript('');
+            }
+          }
+          return; // Don't treat as error
+        case 'not-allowed':
+          console.error('Microphone access denied. Please allow microphone permissions.');
+          break;
+        case 'network':
+          console.error('Network error occurred during speech recognition.');
+          break;
+        case 'aborted':
+          console.warn('Speech recognition was aborted.');
+          break;
+        default:
+          console.error(`Speech recognition error: ${event.error}`);
+      }
+      
+      // Only stop listening for actual errors (not no-speech)
       setIsListening(false);
       setInterimTranscript('');
       

@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demo Activar - Speech to Text</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .activate-btn {
+            padding: 20px 40px;
+            font-size: 20px;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 200px;
+            margin: 20px auto;
+            display: block;
+        }
+        .activate-btn.active {
+            background-color: #e74c3c;
+            color: white;
+            transform: scale(1.05);
+        }
+        .activate-btn.inactive {
+            background-color: #2ecc71;
+            color: white;
+        }
+        .activate-btn:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .status {
+            text-align: center;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .listening {
+            background-color: #ffebee;
+            border: 2px solid #e74c3c;
+            color: #c62828;
+        }
+        .not-listening {
+            background-color: #e8f5e8;
+            border: 2px solid #2ecc71;
+            color: #2e7d32;
+        }
+        .transcript-area {
+            border: 2px solid #ddd;
+            padding: 20px;
+            margin: 20px 0;
+            min-height: 80px;
+            background-color: #fafafa;
+            border-radius: 8px;
+            font-size: 16px;
+            line-height: 1.5;
+        }
+        .transcript-final {
+            color: #333;
+            font-weight: 500;
+        }
+        .transcript-interim {
+            color: #666;
+            font-style: italic;
+        }
+        .placeholder {
+            color: #999;
+            text-align: center;
+            font-style: italic;
+        }
+        .messages-history {
+            border: 2px solid #2ecc71;
+            padding: 20px;
+            margin: 20px 0;
+            min-height: 200px;
+            max-height: 400px;
+            background-color: #f8fff8;
+            border-radius: 8px;
+            overflow-y: auto;
+        }
+        .message-item {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border-left: 4px solid #2ecc71;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .message-timestamp {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        .message-text {
+            font-size: 16px;
+            color: #333;
+            line-height: 1.4;
+        }
+        .no-messages {
+            color: #999;
+            text-align: center;
+            font-style: italic;
+            padding: 40px 0;
+        }
+        .pulse {
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const useSpeechToText = (config = {}) => {
+            const [isListening, setIsListening] = React.useState(false);
+            const [transcript, setTranscript] = React.useState('');
+            const [interimTranscript, setInterimTranscript] = React.useState('');
+            const [isSupported, setIsSupported] = React.useState(false);
+            const recognitionRef = React.useRef(null);
+            const silenceTimerRef = React.useRef(null);
+            const lastSpeechTimeRef = React.useRef(Date.now());
+            const isListeningRef = React.useRef(false);
+
+            React.useEffect(() => {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                setIsSupported(!!SpeechRecognition);
+                
+                if (SpeechRecognition) {
+                    const recognition = new SpeechRecognition();
+                    recognition.continuous = true;
+                    recognition.interimResults = true;
+                    recognition.lang = config.language || 'es-ES';
+                    
+                    recognition.onstart = () => {
+                        setIsListening(true);
+                        isListeningRef.current = true;
+                        lastSpeechTimeRef.current = Date.now();
+                        console.log('🎤 Reconocimiento iniciado');
+                        
+                        // Iniciar timer para detectar silencio
+                        const checkSilence = () => {
+                            if (isListeningRef.current) {
+                                const timeSinceLastSpeech = Date.now() - lastSpeechTimeRef.current;
+                                if (timeSinceLastSpeech >= (config.silenceTimeout || 800)) {
+                                    console.log('🔇 Silencio detectado tras ' + timeSinceLastSpeech + 'ms');
+                                    if (config.onSilenceDetected) {
+                                        config.onSilenceDetected();
+                                    }
+                                    return;
+                                }
+                                silenceTimerRef.current = setTimeout(checkSilence, 100);
+                            }
+                        };
+                        silenceTimerRef.current = setTimeout(checkSilence, 100);
+                    };
+                    
+                    recognition.onend = () => {
+                        setIsListening(false);
+                        isListeningRef.current = false;
+                        clearTimeout(silenceTimerRef.current);
+                        console.log('⏹️ Reconocimiento terminado');
+                    };
+                    
+                    recognition.onresult = (event) => {
+                        let finalTranscript = '';
+                        let interim = '';
+                        
+                        // Actualizar tiempo de último habla
+                        lastSpeechTimeRef.current = Date.now();
+                        
+                        for (let i = 0; i < event.results.length; i++) {
+                            const result = event.results[i];
+                            if (result.isFinal) {
+                                finalTranscript += result[0].transcript + ' ';
+                            } else {
+                                interim += result[0].transcript;
+                            }
+                        }
+                        
+                        if (finalTranscript) {
+                            setTranscript(prev => prev + finalTranscript);
+                        }
+                        setInterimTranscript(interim);
+                    };
+                    
+                    recognition.onerror = (event) => {
+                        console.error('Error en reconocimiento:', event.error);
+                        clearTimeout(silenceTimerRef.current);
+                    };
+                    
+                    recognitionRef.current = recognition;
+                }
+            }, []);
+
+            const startListening = React.useCallback(async () => {
+                if (recognitionRef.current && !isListening) {
+                    try {
+                        recognitionRef.current.start();
+                    } catch (error) {
+                        console.error('Error al iniciar:', error);
+                    }
+                }
+            }, [isListening]);
+
+            const stopListening = React.useCallback(async () => {
+                if (recognitionRef.current && isListening) {
+                    clearTimeout(silenceTimerRef.current);
+                    recognitionRef.current.stop();
+                }
+            }, [isListening]);
+
+            const clearTranscript = React.useCallback(() => {
+                setTranscript('');
+                setInterimTranscript('');
+            }, []);
+
+            return {
+                isListening,
+                transcript,
+                interimTranscript,
+                isSupported,
+                startListening,
+                stopListening,
+                clearTranscript
+            };
+        };
+
+        const DemoActivar = () => {
+            const [currentTranscript, setCurrentTranscript] = React.useState('');
+            const [messages, setMessages] = React.useState([]);
+            
+            const {
+                isListening,
+                transcript,
+                interimTranscript,
+                isSupported,
+                startListening,
+                stopListening,
+                clearTranscript
+            } = useSpeechToText({
+                language: 'es-ES',
+                silenceTimeout: 800,
+                onSilenceDetected: () => {
+                    console.log('🔇 Silencio detectado, guardando mensaje...');
+                    // Guardar el mensaje actual cuando se detecta silencio
+                    const currentText = transcript.trim() || interimTranscript.trim();
+                    if (currentText) {
+                        const newMessage = {
+                            id: Date.now(),
+                            text: currentText,
+                            timestamp: new Date().toLocaleTimeString()
+                        };
+                        setMessages(prev => [...prev, newMessage]);
+                    }
+                    stopListening();
+                }
+            });
+
+            // Efecto para limpiar transcripción cuando termina de escuchar
+            React.useEffect(() => {
+                if (!isListening && transcript) {
+                    // Limpiar transcripción después de guardar
+                    setTimeout(() => {
+                        clearTranscript();
+                        setCurrentTranscript('');
+                    }, 100);
+                }
+            }, [isListening, transcript]);
+
+            const toggleListening = () => {
+                if (isListening) {
+                    stopListening();
+                } else {
+                    startListening();
+                }
+            };
+
+            return (
+                <div className="container">
+                    <h1 style={{textAlign: 'center', color: '#333', marginBottom: '30px'}}>
+                        🎤 Demo Activar Voice
+                    </h1>
+                    
+                    {!isSupported && (
+                        <div style={{
+                            color: 'red', 
+                            padding: '15px', 
+                            backgroundColor: '#fee',
+                            border: '1px solid #fcc',
+                            borderRadius: '5px',
+                            textAlign: 'center',
+                            marginBottom: '20px'
+                        }}>
+                            ⚠️ Tu navegador no soporta Speech Recognition
+                        </div>
+                    )}
+                    
+                    <div className={`status ${isListening ? 'listening pulse' : 'not-listening'}`}>
+                        {isListening ? '🎤 ESCUCHANDO...' : '⏸️ LISTO PARA ACTIVAR'}
+                    </div>
+
+                    <button 
+                        className={`activate-btn ${isListening ? 'active' : 'inactive'}`}
+                        onClick={toggleListening}
+                        disabled={!isSupported}
+                    >
+                        {isListening ? '🔴 DETENER' : '🎯 ACTIVAR'}
+                    </button>
+
+                    <div className="transcript-area">
+                        <h3 style={{margin: '0 0 15px 0', color: '#555'}}>Transcripción en tiempo real:</h3>
+                        
+                        {isListening && transcript && (
+                            <div className="transcript-final">
+                                📝 {transcript}
+                            </div>
+                        )}
+                        
+                        {isListening && interimTranscript && (
+                            <div className="transcript-interim">
+                                💭 {interimTranscript}
+                            </div>
+                        )}
+                        
+                        {!isListening && !transcript && !interimTranscript && (
+                            <div className="placeholder">
+                                Presiona "ACTIVAR" y comienza a hablar...
+                                <br />
+                                Se detendrá automáticamente cuando detecte silencio.
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="messages-history">
+                        <h3 style={{margin: '0 0 15px 0', color: '#2e7d32'}}>📚 Historial de Mensajes:</h3>
+                        
+                        {messages.length === 0 ? (
+                            <div className="no-messages">
+                                Aún no hay mensajes grabados...
+                                <br />
+                                Los mensajes aparecerán aquí cuando detecte silencio.
+                            </div>
+                        ) : (
+                            messages.map(message => (
+                                <div key={message.id} className="message-item">
+                                    <div className="message-timestamp">
+                                        🕐 {message.timestamp}
+                                    </div>
+                                    <div className="message-text">
+                                        {message.text}
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+
+                    <div style={{
+                        marginTop: '30px', 
+                        fontSize: '14px', 
+                        color: '#666',
+                        backgroundColor: '#f8f9fa',
+                        padding: '15px',
+                        borderRadius: '8px'
+                    }}>
+                        <h4 style={{margin: '0 0 10px 0'}}>💡 Cómo funciona:</h4>
+                        <ul style={{margin: 0, paddingLeft: '20px'}}>
+                            <li>Presiona <strong>"ACTIVAR"</strong> para comenzar a escuchar</li>
+                            <li>Habla normalmente</li>
+                            <li>Se detendrá automáticamente tras 2 segundos de silencio</li>
+                            <li>La transcripción aparecerá cuando termine</li>
+                            <li>Presiona <strong>"ACTIVAR"</strong> nuevamente para una nueva grabación</li>
+                        </ul>
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.render(<DemoActivar />, document.getElementById('root'));
+    </script>
+</body>
+</html>

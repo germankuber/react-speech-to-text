@@ -1,10 +1,19 @@
 {
   "name": "react-speech-to-text-gk",
-  "version": "1.0.3",
+  "version": "1.0.5",
   "description": "Advanced React speech-to-text library with real-time audio analysis and comprehensive speech metrics",
   "main": "dist/index.js",
   "module": "dist/index.esm.js",
-  "types": "dist/lib/index.d.ts",
+  "types": "dist/index.d.ts",
+  "browser": "dist/index.esm.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.esm.js",
+      "require": "./dist/index.js",
+      "default": "./dist/index.esm.js"
+    }
+  },
   "files": [
     "dist"
   ],
