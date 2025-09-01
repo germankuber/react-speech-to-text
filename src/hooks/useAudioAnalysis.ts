@@ -110,8 +110,20 @@ export const useAudioAnalysis = (performanceMode: PerformanceMode = PerformanceM
     const freqDataArray = new Uint8Array(bufferLength);
     const dataArray = new Uint8Array(bufferLength);
 
-    // Optimized volume calculation with pre-computed ranges
+    // Get fresh data from analyzer
     analyserRef.current.getByteFrequencyData(freqDataArray);
+    analyserRef.current.getByteTimeDomainData(dataArray);
+    
+    // Simple volume calculation using time domain data (more responsive)
+    let sum = 0;
+    for (let i = 0; i < bufferLength; i++) {
+      const sample = (dataArray[i] - 128) / 128;
+      sum += Math.abs(sample);
+    }
+    const averageLevel = sum / bufferLength;
+    const volumePercent = Math.min(100, averageLevel * 200); // Scale to 0-100
+    
+    // Frequency domain volume for comparison
     const voiceRangeStart = Math.floor((config.voiceRange.start / (sampleRate / 2)) * bufferLength);
     const voiceRangeEnd = Math.floor((config.voiceRange.end / (sampleRate / 2)) * bufferLength);
     

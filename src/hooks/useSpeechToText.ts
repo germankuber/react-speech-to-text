@@ -62,6 +62,7 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
   const uiUpdateIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const transcriptRef = useRef<string>('');
   const interimTranscriptRef = useRef<string>('');
+  const isListeningRef = useRef<boolean>(false);
   
   // New refs for speech start/end detection
   const isSpeakingRef = useRef<boolean>(false);
