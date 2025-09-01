@@ -36,7 +36,7 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
     optimizedMode = true,
     performanceMode = PerformanceMode.BALANCED,
     audioConfig = {},
-    onSilenceDetected
+    onSpeechCompleted
   } = config;
 
   const [isListening, setIsListening] = useState(false);
@@ -107,8 +107,8 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
         
         setSilenceDetected(true);
         
-        // Call the onSilenceDetected callback if provided
-        if (onSilenceDetected) {
+        // Call the onSpeechCompleted callback if provided
+        if (onSpeechCompleted) {
           const silenceData: SilenceDetectedData = {
             silenceDetectedAt,
             silenceTimeout,
@@ -117,7 +117,7 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
             currentInterimTranscript: interimTranscriptRef.current,
             currentAudioMetrics: getAudioData()
           };
-          onSilenceDetected(silenceData);
+          onSpeechCompleted(silenceData);
         }
         
         if (recognitionRef.current) {
@@ -153,7 +153,7 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
     
     setInterimTranscript(interimTranscript);
     interimTranscriptRef.current = interimTranscript;
-  }, [silenceTimeout, stopAudioAnalysis, generateMetadata, wordSplitRegex, onSilenceDetected, getAudioData]);
+  }, [silenceTimeout, stopAudioAnalysis, generateMetadata, wordSplitRegex,  getAudioData]);
 
   // Initialize speech recognition with optimized configuration
   useEffect(() => {
