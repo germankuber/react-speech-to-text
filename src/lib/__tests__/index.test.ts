@@ -257,8 +257,8 @@ describe('Library Exports', () => {
 
     it('should provide fallbacks for unavailable features', () => {
       // This is more of a smoke test to ensure exports are stable
-      expect(SpeechToTextLib.useSpeechToText).not.toThrow();
-      expect(SpeechToTextLib.useAudioAnalysis).not.toThrow();
+      expect(() => SpeechToTextLib.useSpeechToText).not.toThrow();
+      expect(() => SpeechToTextLib.useAudioAnalysis).not.toThrow();
     });
   });
 

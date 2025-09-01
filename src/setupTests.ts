@@ -120,5 +120,12 @@ Object.defineProperty(global, 'navigator', {
   writable: true
 });
 
+// Mock pitchy module to avoid ES module issues
+jest.mock('pitchy', () => ({
+  PitchDetector: jest.fn().mockImplementation(() => ({
+    findPitch: jest.fn().mockReturnValue([440, 0.9])
+  }))
+}));
+
 // Mock timers for better test control
 jest.useFakeTimers();
