@@ -1,27 +1,27 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { 
-  SpeechRecognition, 
-  SpeechRecognitionEvent, 
-  SpeechRecognitionErrorEvent, 
-  SpeechToTextConfig, 
-  SessionMetadata,
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
   AudioMetrics,
   ChartData,
   PerformanceMode,
+  SessionMetadata,
   SilenceDetectedData,
-  SpeechStartData,
   SpeechEndData,
-  SpeechErrorData
+  SpeechErrorData,
+  SpeechRecognition,
+  SpeechRecognitionErrorEvent,
+  SpeechRecognitionEvent,
+  SpeechStartData,
+  SpeechToTextConfig
 } from '../types/speechToText';
+import { generateChartData, generateSessionMetadata } from '../utils/speechToTextUtils';
 import { useAudioAnalysis } from './useAudioAnalysis';
-import { generateSessionMetadata, generateChartData } from '../utils/speechToTextUtils';
 
 interface UseSpeechToTextReturn {
   isListening: boolean;
   transcript: string;
   interimTranscript: string;
   isSupported: boolean;
-  silenceDetected: boolean;
+  speechCompleted: boolean;
   sessionMetadata: SessionMetadata | null;
   audioMetrics: AudioMetrics;
   chartData: ChartData;
@@ -39,9 +39,9 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
     optimizedMode = true,
     performanceMode = PerformanceMode.BALANCED,
     audioConfig = {},
-    onSilenceDetected,
-    onSpeechStart,
-    onSpeechEnd,
+    onSpeechCompleted,
+    onVoiceStart,
+    onVoiceStop,
     onError,
     speechVolumeThreshold = 15,
     speechPauseThreshold = 200
@@ -51,7 +51,7 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
   const [transcript, setTranscript] = useState('');
   const [interimTranscript, setInterimTranscript] = useState('');
   const [isSupported, setIsSupported] = useState(false);
-  const [silenceDetected, setSilenceDetected] = useState(false);
+  const [speechCompleted, setSpeechCompleted] = useState(false);
   const [sessionMetadata, setSessionMetadata] = useState<SessionMetadata | null>(null);
   const [, forceUpdate] = useState(0);
 
@@ -104,7 +104,7 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
       lastVolumeAboveThresholdRef.current = currentTime;
       
       // Speech started - trigger callback if not already speaking
-      if (!isSpeaking && onSpeechStart) {
+      if (!isSpeaking && onVoiceStart) {
         isSpeakingRef.current = true;
         speechStartTimeRef.current = currentTime;
         
@@ -114,7 +114,7 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
           startPitch: lastAnalysis.pitch,
           currentAudioMetrics: getAudioData()
         };
-        onSpeechStart(speechStartData);
+        onVoiceStart(speechStartData);
       }
       
       // Clear any pending speech end timer
@@ -130,7 +130,7 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
         // Speech ended - trigger callback immediately
         isSpeakingRef.current = false;
         
-        if (onSpeechEnd) {
+        if (onVoiceStop) {
           const speechEndData: SpeechEndData = {
             speechEndedAt: currentTime,
             pauseDuration: timeSinceLastSpeech,
@@ -140,7 +140,7 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
             currentInterimTranscript: interimTranscriptRef.current,
             currentAudioMetrics: getAudioData()
           };
-          onSpeechEnd(speechEndData);
+          onVoiceStop(speechEndData);
         }
       }
     }
@@ -148,8 +148,8 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
     getLastAnalysis, 
     speechVolumeThreshold, 
     speechPauseThreshold, 
-    onSpeechStart, 
-    onSpeechEnd, 
+    onVoiceStart, 
+    onVoiceStop, 
     getAudioData
   ]);
 
@@ -170,7 +170,7 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
   const processTranscript = useCallback((finalTranscript: string, interimTranscript: string) => {
     if (finalTranscript || interimTranscript) {
       lastSpeechTimeRef.current = Date.now();
-      setSilenceDetected(false);
+      setSpeechCompleted(false);
       
       // Clear existing timer
       if (silenceTimerRef.current) {
@@ -182,10 +182,10 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
         const silenceDetectedAt = Date.now();
         const timeSinceLastSpeech = silenceDetectedAt - lastSpeechTimeRef.current;
         
-        setSilenceDetected(true);
+        setSpeechCompleted(true);
         
-        // Call the onSilenceDetected callback if provided
-        if (onSilenceDetected) {
+        // Call the onSpeechCompleted callback if provided
+        if (onSpeechCompleted) {
           const silenceData: SilenceDetectedData = {
             silenceDetectedAt,
             silenceTimeout,
@@ -194,7 +194,7 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
             currentInterimTranscript: interimTranscriptRef.current,
             currentAudioMetrics: getAudioData()
           };
-          onSilenceDetected(silenceData);
+          onSpeechCompleted(silenceData);
         }
         
         if (recognitionRef.current) {
@@ -230,7 +230,7 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
     
     setInterimTranscript(interimTranscript);
     interimTranscriptRef.current = interimTranscript;
-  }, [silenceTimeout, stopAudioAnalysis, generateMetadata, wordSplitRegex, onSilenceDetected, getAudioData]);
+  }, [silenceTimeout, stopAudioAnalysis, generateMetadata, wordSplitRegex, onSpeechCompleted, getAudioData]);
 
   // Initialize speech recognition with optimized configuration
   useEffect(() => {
@@ -412,7 +412,7 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
       }, 100);
     } else {
       // Start listening
-      setSilenceDetected(false);
+      setSpeechCompleted(false);
       setSessionMetadata(null);
       currentWordsRef.current.length = 0; // Efficient array clearing
       transcriptRef.current = '';
@@ -444,7 +444,7 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
         console.error('Error starting speech recognition:', error);
         // Reset state on error
         setIsListening(false);
-        setSilenceDetected(false);
+        setSpeechCompleted(false);
       }
     }
   }, [isListening, stopAudioAnalysis, generateMetadata, initializeAudioAnalysis, audioConfig]);
@@ -452,7 +452,7 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
   const startListening = useCallback(async () => {
     if (!recognitionRef.current || isListening) return;
 
-    setSilenceDetected(false);
+    setSpeechCompleted(false);
     setSessionMetadata(null);
     currentWordsRef.current.length = 0;
     transcriptRef.current = '';
@@ -482,7 +482,7 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
     } catch (error) {
       console.error('Error starting speech recognition:', error);
       setIsListening(false);
-      setSilenceDetected(false);
+      setSpeechCompleted(false);
     }
   }, [isListening, initializeAudioAnalysis, audioConfig]);
 
@@ -507,7 +507,7 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
     setInterimTranscript('');
     transcriptRef.current = '';
     interimTranscriptRef.current = '';
-    setSilenceDetected(false);
+    setSpeechCompleted(false);
     setSessionMetadata(null);
     currentWordsRef.current.length = 0; // Efficient array clearing
     
@@ -550,7 +550,7 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
     transcript,
     interimTranscript,
     isSupported,
-    silenceDetected,
+    speechCompleted,
     sessionMetadata,
     audioMetrics,
     chartData,

@@ -169,22 +169,22 @@ export interface SpeechToTextConfig {
   };
   
   /**
-   * Callback function triggered when silence is detected
-   * Provides detailed information about the silence event and current state
+   * Callback function triggered when speech is completed (after silence timeout)
+   * Provides detailed information about the completed speech session
    */
-  onSilenceDetected?: (data: SilenceDetectedData) => void;
+  onSpeechCompleted?: (data: SilenceDetectedData) => void;
   
   /**
-   * Callback function triggered when speech starts (user begins speaking)
-   * Provides detailed information about the speech start event
+   * Callback function triggered when voice starts (user begins speaking)
+   * Provides detailed information about the voice start event
    */
-  onSpeechStart?: (data: SpeechStartData) => void;
+  onVoiceStart?: (data: SpeechStartData) => void;
   
   /**
-   * Callback function triggered when speech ends (user stops speaking)
-   * Different from silence detection - this triggers immediately when speech pauses
+   * Callback function triggered when voice stops (user stops speaking)
+   * Different from speech completion - this triggers immediately when voice pauses
    */
-  onSpeechEnd?: (data: SpeechEndData) => void;
+  onVoiceStop?: (data: SpeechEndData) => void;
   
   /**
    * Volume threshold (0-100) to detect speech start/end
