@@ -87,6 +87,9 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
       spectralCentroidDataRef.current
     );
   }, [getSessionStartTime, volumeDataRef, pitchDataRef, spectralCentroidDataRef]);
+  // useEffect(() => {
+  //   console.log('🔊 Volume Data Updated:',audioMetrics.volumeData);
+  // }, [audioMetrics.volumeData]);
 
   // Optimized word processing with regex caching
   const wordSplitRegex = useMemo(() => /\s+/, []);
