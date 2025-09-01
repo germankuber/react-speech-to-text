@@ -1,49 +1,40 @@
 import React, { useState } from 'react';
-import CompleteDashboard from './components/CompleteDashboard';
 import VolumeVisualizer from './components/VolumeVisualizer';
+import CompleteDashboard from './components/CompleteDashboard';
 
 const App: React.FC = () => {
-  const [currentView, setCurrentView] = useState<'basic' | 'advanced'>('basic');
+  const [currentView, setCurrentView] = useState<'volume' | 'complete'>('complete');
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <nav className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
-            <div className="flex">
-              <div className="flex-shrink-0 flex items-center">
-                <h1 className="text-xl font-bold text-gray-900">Speech to Text Examples</h1>
-              </div>
-              <div className="ml-6 flex space-x-8">
-                <button
-                  onClick={() => setCurrentView('basic')}
-                  className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
-                    currentView === 'basic'
-                      ? 'border-blue-500 text-gray-900'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  Basic Example
-                </button>
-                <button
-                  onClick={() => setCurrentView('advanced')}
-                  className={`inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium ${
-                    currentView === 'advanced'
-                      ? 'border-blue-500 text-gray-900'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  Advanced Dashboard
-                </button>
-              </div>
-            </div>
-          </div>
+      {/* Navigation */}
+      <nav className="bg-white border-b border-slate-200 px-6 py-3">
+        <div className="max-w-7xl mx-auto flex space-x-4">
+          <button
+            onClick={() => setCurrentView('complete')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              currentView === 'complete'
+                ? 'bg-blue-600 text-white'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            📊 Complete Dashboard
+          </button>
+          <button
+            onClick={() => setCurrentView('volume')}
+            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+              currentView === 'volume'
+                ? 'bg-blue-600 text-white'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            🎤 Volume Visualizer
+          </button>
         </div>
       </nav>
 
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        {currentView === 'basic' ? <VolumeVisualizer /> : <CompleteDashboard />}
-      </main>
+      {/* Content */}
+      {currentView === 'complete' ? <CompleteDashboard /> : <VolumeVisualizer />}
     </div>
   );
 };
