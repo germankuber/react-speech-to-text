@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import BasicExample from './BasicExample';
 import AdvancedExample from './AdvancedExample';
 import AudioAnalysisExample from './AudioAnalysisExample';
+import SpeechDetectionExample from './SpeechDetectionExample';
 
-type ExampleType = 'basic' | 'advanced' | 'audio';
+type ExampleType = 'basic' | 'advanced' | 'audio' | 'detection';
 
 const DemoApp: React.FC = () => {
-    const [currentExample, setCurrentExample] = useState<ExampleType>('basic');
+    const [currentExample, setCurrentExample] = useState<ExampleType>('detection');
 
     const styles = {
         container: {
@@ -59,7 +60,8 @@ const DemoApp: React.FC = () => {
     const examples = [
         { id: 'basic' as ExampleType, title: 'Básico', description: 'Ejemplo simple de Speech to Text' },
         { id: 'advanced' as ExampleType, title: 'Avanzado', description: 'Configuración avanzada con múltiples opciones' },
-        { id: 'audio' as ExampleType, title: 'Análisis de Audio', description: 'Análisis de audio en tiempo real' }
+        { id: 'audio' as ExampleType, title: 'Análisis de Audio', description: 'Análisis de audio en tiempo real' },
+        { id: 'detection' as ExampleType, title: '🆕 Detección de Habla', description: 'Detección de inicio y fin de habla en tiempo real' }
     ];
 
     const renderExample = () => {
@@ -70,6 +72,8 @@ const DemoApp: React.FC = () => {
                 return <AdvancedExample />;
             case 'audio':
                 return <AudioAnalysisExample />;
+            case 'detection':
+                return <SpeechDetectionExample />;
             default:
                 return <BasicExample />;
         }
@@ -80,6 +84,15 @@ const DemoApp: React.FC = () => {
             <header style={styles.header}>
                 <h1>🎤 React Speech to Text - Demos</h1>
                 <p>Ejemplos de uso de la librería de reconocimiento de voz</p>
+                <div style={{
+                    backgroundColor: 'rgba(255, 193, 7, 0.2)',
+                    padding: '10px 15px',
+                    borderRadius: '5px',
+                    marginTop: '15px',
+                    border: '2px solid #ffc107'
+                }}>
+                    <strong>🆕 NUEVA FUNCIONALIDAD:</strong> Detección de inicio y fin de habla en tiempo real
+                </div>
             </header>
 
             <nav style={styles.navigation}>

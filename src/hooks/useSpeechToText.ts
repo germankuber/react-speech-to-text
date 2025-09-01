@@ -8,7 +8,9 @@ import {
   AudioMetrics,
   ChartData,
   PerformanceMode,
-  SilenceDetectedData
+  SilenceDetectedData,
+  SpeechStartData,
+  SpeechEndData
 } from '../types/speechToText';
 import { useAudioAnalysis } from './useAudioAnalysis';
 import { generateSessionMetadata, generateChartData } from '../utils/speechToTextUtils';
@@ -36,7 +38,11 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
     optimizedMode = true,
     performanceMode = PerformanceMode.BALANCED,
     audioConfig = {},
-    onSilenceDetected
+    onSilenceDetected,
+    onSpeechStart,
+    onSpeechEnd,
+    speechVolumeThreshold = 15,
+    speechPauseThreshold = 200
   } = config;
 
   const [isListening, setIsListening] = useState(false);
@@ -54,6 +60,12 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
   const uiUpdateIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const transcriptRef = useRef<string>('');
   const interimTranscriptRef = useRef<string>('');
+  
+  // New refs for speech start/end detection
+  const isSpeakingRef = useRef<boolean>(false);
+  const speechEndTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastVolumeAboveThresholdRef = useRef<number>(0);
+  const speechStartTimeRef = useRef<number>(0);
 
   const {
     initializeAudioAnalysis,
@@ -63,7 +75,8 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
     getSessionStartTime,
     volumeDataRef,
     pitchDataRef,
-    spectralCentroidDataRef
+    spectralCentroidDataRef,
+    getLastAnalysis
   } = useAudioAnalysis(performanceMode);
 
   // Get current audio metrics (not memoized to allow real-time updates)
@@ -75,6 +88,68 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
     audioMetrics.pitchData,
     sessionMetadata || undefined
   ), [audioMetrics.volumeData, audioMetrics.pitchData, sessionMetadata]);
+
+  // Speech detection logic based on volume threshold
+  const handleSpeechDetection = useCallback(() => {
+    const lastAnalysis = getLastAnalysis();
+    if (!lastAnalysis) return;
+
+    const currentVolume = lastAnalysis.volumeForUI;
+    const currentTime = Date.now();
+    const isSpeaking = isSpeakingRef.current;
+
+    if (currentVolume >= speechVolumeThreshold) {
+      lastVolumeAboveThresholdRef.current = currentTime;
+      
+      // Speech started - trigger callback if not already speaking
+      if (!isSpeaking && onSpeechStart) {
+        isSpeakingRef.current = true;
+        speechStartTimeRef.current = currentTime;
+        
+        const speechStartData: SpeechStartData = {
+          speechStartedAt: currentTime,
+          triggerVolume: currentVolume,
+          startPitch: lastAnalysis.pitch,
+          currentAudioMetrics: getAudioData()
+        };
+        onSpeechStart(speechStartData);
+      }
+      
+      // Clear any pending speech end timer
+      if (speechEndTimerRef.current) {
+        clearTimeout(speechEndTimerRef.current);
+        speechEndTimerRef.current = null;
+      }
+    } else if (isSpeaking) {
+      // Volume below threshold and we were speaking
+      const timeSinceLastSpeech = currentTime - lastVolumeAboveThresholdRef.current;
+      
+      if (!speechEndTimerRef.current && timeSinceLastSpeech >= speechPauseThreshold) {
+        // Speech ended - trigger callback immediately
+        isSpeakingRef.current = false;
+        
+        if (onSpeechEnd) {
+          const speechEndData: SpeechEndData = {
+            speechEndedAt: currentTime,
+            pauseDuration: timeSinceLastSpeech,
+            endVolume: currentVolume,
+            endPitch: lastAnalysis.pitch,
+            currentTranscript: transcriptRef.current,
+            currentInterimTranscript: interimTranscriptRef.current,
+            currentAudioMetrics: getAudioData()
+          };
+          onSpeechEnd(speechEndData);
+        }
+      }
+    }
+  }, [
+    getLastAnalysis, 
+    speechVolumeThreshold, 
+    speechPauseThreshold, 
+    onSpeechStart, 
+    onSpeechEnd, 
+    getAudioData
+  ]);
 
   // Memoized metadata generation function
   const generateMetadata = useCallback(() => {
@@ -273,9 +348,17 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
         clearInterval(uiUpdateIntervalRef.current);
         uiUpdateIntervalRef.current = null;
       }
+      if (speechEndTimerRef.current) {
+        clearTimeout(speechEndTimerRef.current);
+        speechEndTimerRef.current = null;
+      }
+      // Reset speech detection state
+      isSpeakingRef.current = false;
+      lastVolumeAboveThresholdRef.current = 0;
+      speechStartTimeRef.current = 0;
       stopAudioAnalysis();
     };
-  }, [language, optimizedMode, processTranscript, stopAudioAnalysis]);
+  }, [language, optimizedMode, processTranscript, stopAudioAnalysis, handleSpeechDetection]);
 
   const toggleListening = useCallback(async () => {
     if (!recognitionRef.current) return;
@@ -303,16 +386,26 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
       interimTranscriptRef.current = '';
       lastSpeechTimeRef.current = Date.now();
       
+      // Reset speech detection state
+      isSpeakingRef.current = false;
+      lastVolumeAboveThresholdRef.current = 0;
+      speechStartTimeRef.current = 0;
+      if (speechEndTimerRef.current) {
+        clearTimeout(speechEndTimerRef.current);
+        speechEndTimerRef.current = null;
+      }
+      
       try {
         await initializeAudioAnalysis(audioConfig);
         recognitionRef.current.start();
         
-        // Start UI update interval for real-time metrics display
+        // Start UI update interval for real-time metrics display and speech detection
         uiUpdateIntervalRef.current = setInterval(() => {
           if (isListening) {
+            handleSpeechDetection(); // Monitor speech start/end
             forceUpdate(prev => prev + 1);
           }
-        }, 100); // Update UI every 100ms
+        }, 50); // Update every 50ms for better speech detection responsiveness
         
       } catch (error) {
         console.error('Error starting speech recognition:', error);
@@ -333,15 +426,25 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
     interimTranscriptRef.current = '';
     lastSpeechTimeRef.current = Date.now();
     
+    // Reset speech detection state
+    isSpeakingRef.current = false;
+    lastVolumeAboveThresholdRef.current = 0;
+    speechStartTimeRef.current = 0;
+    if (speechEndTimerRef.current) {
+      clearTimeout(speechEndTimerRef.current);
+      speechEndTimerRef.current = null;
+    }
+    
     try {
       await initializeAudioAnalysis(audioConfig);
       recognitionRef.current.start();
       
       uiUpdateIntervalRef.current = setInterval(() => {
         if (isListening) {
+          handleSpeechDetection(); // Monitor speech start/end
           forceUpdate(prev => prev + 1);
         }
-      }, 100);
+      }, 50);
       
     } catch (error) {
       console.error('Error starting speech recognition:', error);
@@ -380,6 +483,15 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
       clearInterval(uiUpdateIntervalRef.current);
       uiUpdateIntervalRef.current = null;
     }
+    
+    // Clear speech detection state
+    isSpeakingRef.current = false;
+    if (speechEndTimerRef.current) {
+      clearTimeout(speechEndTimerRef.current);
+      speechEndTimerRef.current = null;
+    }
+    lastVolumeAboveThresholdRef.current = 0;
+    speechStartTimeRef.current = 0;
     
     clearAudioData();
   }, [clearAudioData]);

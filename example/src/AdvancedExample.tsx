@@ -1,10 +1,19 @@
 import React, { useState } from 'react';
-import { useSpeechToText } from 'react-speech-to-text-gk';
+import { useSpeechToText, SpeechStartData, SpeechEndData, SilenceDetectedData } from 'react-speech-to-text-gk';
 
 const AdvancedExample: React.FC = () => {
     const [language, setLanguage] = useState('es-ES');
     const [silenceTimeout, setSilenceTimeout] = useState(700);
     const [optimizedMode, setOptimizedMode] = useState(true);
+    const [speechVolumeThreshold, setSpeechVolumeThreshold] = useState(15);
+    const [speechPauseThreshold, setSpeechPauseThreshold] = useState(200);
+    
+    // Estado para eventos de habla
+    const [speechEvents, setSpeechEvents] = useState<Array<{
+        type: 'start' | 'end' | 'silence';
+        timestamp: number;
+        data: any;
+    }>>([]);
 
     const {
         isListening,
@@ -20,7 +29,33 @@ const AdvancedExample: React.FC = () => {
     } = useSpeechToText({
         language,
         silenceTimeout,
-        optimizedMode
+        optimizedMode,
+        speechVolumeThreshold,
+        speechPauseThreshold,
+        onSpeechStart: (data: SpeechStartData) => {
+            console.log('🎤 Habla iniciada:', data);
+            setSpeechEvents(prev => [...prev, {
+                type: 'start',
+                timestamp: Date.now(),
+                data
+            }]);
+        },
+        onSpeechEnd: (data: SpeechEndData) => {
+            console.log('🤐 Habla finalizada:', data);
+            setSpeechEvents(prev => [...prev, {
+                type: 'end',
+                timestamp: Date.now(),
+                data
+            }]);
+        },
+        onSilenceDetected: (data: SilenceDetectedData) => {
+            console.log('🔇 Silencio detectado:', data);
+            setSpeechEvents(prev => [...prev, {
+                type: 'silence',
+                timestamp: Date.now(),
+                data
+            }]);
+        }
     });
 
     const languages = [
@@ -185,6 +220,46 @@ const AdvancedExample: React.FC = () => {
                         Modo optimizado (más rápido)
                     </label>
                 </div>
+
+                <div style={styles.configItem}>
+                    <label style={styles.label} htmlFor="speech-volume-threshold">
+                        Umbral de volumen para habla (0-100):
+                    </label>
+                    <input
+                        id="speech-volume-threshold"
+                        type="number"
+                        style={styles.select}
+                        value={speechVolumeThreshold}
+                        onChange={(e) => setSpeechVolumeThreshold(Number(e.target.value))}
+                        disabled={isListening}
+                        min="0"
+                        max="100"
+                        step="1"
+                    />
+                    <small style={{display: 'block', marginTop: '5px', color: '#666'}}>
+                        Volumen mínimo para detectar inicio de habla
+                    </small>
+                </div>
+
+                <div style={styles.configItem}>
+                    <label style={styles.label} htmlFor="speech-pause-threshold">
+                        Umbral de pausa para fin de habla (ms):
+                    </label>
+                    <input
+                        id="speech-pause-threshold"
+                        type="number"
+                        style={styles.select}
+                        value={speechPauseThreshold}
+                        onChange={(e) => setSpeechPauseThreshold(Number(e.target.value))}
+                        disabled={isListening}
+                        min="50"
+                        max="1000"
+                        step="50"
+                    />
+                    <small style={{display: 'block', marginTop: '5px', color: '#666'}}>
+                        Duración de pausa para detectar fin de habla
+                    </small>
+                </div>
             </div>
             
             <div style={{
@@ -259,6 +334,54 @@ const AdvancedExample: React.FC = () => {
                 )}
             </div>
 
+            {speechEvents.length > 0 && (
+                <div style={{...styles.configSection, backgroundColor: '#fff8e1'}}>
+                    <h4>📅 Eventos de habla en tiempo real:</h4>
+                    <div style={{ maxHeight: '200px', overflowY: 'auto', fontSize: '12px' }}>
+                        {speechEvents.slice(-10).map((event, index) => {
+                            const time = new Date(event.timestamp).toLocaleTimeString();
+                            let icon = '';
+                            let description = '';
+                            
+                            switch (event.type) {
+                                case 'start':
+                                    icon = '🎤';
+                                    description = `Inicio de habla (Vol: ${event.data.triggerVolume.toFixed(1)}, Pitch: ${event.data.startPitch.toFixed(1)}Hz)`;
+                                    break;
+                                case 'end':
+                                    icon = '🤐';
+                                    description = `Fin de habla (Pausa: ${event.data.pauseDuration}ms, Vol: ${event.data.endVolume.toFixed(1)})`;
+                                    break;
+                                case 'silence':
+                                    icon = '🔇';
+                                    description = `Silencio detectado (${event.data.timeSinceLastSpeech}ms sin habla)`;
+                                    break;
+                            }
+                            
+                            return (
+                                <div key={index} style={{ 
+                                    padding: '5px 0', 
+                                    borderBottom: '1px solid #eee',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '10px'
+                                }}>
+                                    <span>{icon}</span>
+                                    <span style={{color: '#666', minWidth: '80px'}}>{time}</span>
+                                    <span>{description}</span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                    <button 
+                        style={{...styles.button, backgroundColor: '#ff9800', color: 'white', fontSize: '12px', padding: '5px 10px'}}
+                        onClick={() => setSpeechEvents([])}
+                    >
+                        Limpiar eventos
+                    </button>
+                </div>
+            )}
+
             <div style={{marginTop: '20px', fontSize: '14px', color: '#666'}}>
                 <h4>Características del ejemplo avanzado:</h4>
                 <ul>
@@ -267,6 +390,9 @@ const AdvancedExample: React.FC = () => {
                     <li><strong>Modo optimizado:</strong> Balance entre velocidad y precisión</li>
                     <li><strong>Métricas en tiempo real:</strong> Análisis de audio y sesión</li>
                     <li><strong>Detección de silencio:</strong> Indicador visual de actividad</li>
+                    <li><strong>🆕 Detección de inicio de habla:</strong> Se activa cuando empiezas a hablar</li>
+                    <li><strong>🆕 Detección de fin de habla:</strong> Se activa cuando dejas de hablar (inmediato)</li>
+                    <li><strong>🆕 Umbrales configurables:</strong> Controla la sensibilidad de detección</li>
                 </ul>
             </div>
         </div>

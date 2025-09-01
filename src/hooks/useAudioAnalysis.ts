@@ -331,6 +331,8 @@ export const useAudioAnalysis = (performanceMode: PerformanceMode = PerformanceM
     getSessionStartTime,
     volumeDataRef,
     pitchDataRef,
-    spectralCentroidDataRef
+    spectralCentroidDataRef,
+    // Add access to last analysis for real-time speech detection
+    getLastAnalysis: () => lastAnalysisRef.current
   };
 };

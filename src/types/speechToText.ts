@@ -173,6 +173,30 @@ export interface SpeechToTextConfig {
    * Provides detailed information about the silence event and current state
    */
   onSilenceDetected?: (data: SilenceDetectedData) => void;
+  
+  /**
+   * Callback function triggered when speech starts (user begins speaking)
+   * Provides detailed information about the speech start event
+   */
+  onSpeechStart?: (data: SpeechStartData) => void;
+  
+  /**
+   * Callback function triggered when speech ends (user stops speaking)
+   * Different from silence detection - this triggers immediately when speech pauses
+   */
+  onSpeechEnd?: (data: SpeechEndData) => void;
+  
+  /**
+   * Volume threshold (0-100) to detect speech start/end
+   * @default 15
+   */
+  speechVolumeThreshold?: number;
+  
+  /**
+   * Minimum pause duration (milliseconds) to trigger speech end
+   * @default 200
+   */
+  speechPauseThreshold?: number;
 }
 
 /**
@@ -220,5 +244,39 @@ export interface SilenceDetectedData {
   /** Current interim transcript at the time of silence detection */
   currentInterimTranscript: string;
   /** Current audio metrics at the time of silence detection */
+  currentAudioMetrics: AudioMetrics;
+}
+
+/**
+ * Data provided when speech starts (user begins speaking)
+ */
+export interface SpeechStartData {
+  /** Timestamp when speech started (milliseconds since epoch) */
+  speechStartedAt: number;
+  /** Volume level that triggered the speech detection */
+  triggerVolume: number;
+  /** Pitch frequency detected at speech start (Hz, 0 if no pitch) */
+  startPitch: number;
+  /** Current audio metrics at the time of speech start */
+  currentAudioMetrics: AudioMetrics;
+}
+
+/**
+ * Data provided when speech ends (user stops speaking)
+ */
+export interface SpeechEndData {
+  /** Timestamp when speech ended (milliseconds since epoch) */
+  speechEndedAt: number;
+  /** Duration of the pause that triggered the speech end detection (milliseconds) */
+  pauseDuration: number;
+  /** Volume level when speech ended */
+  endVolume: number;
+  /** Last pitch frequency before speech ended (Hz, 0 if no pitch) */
+  endPitch: number;
+  /** Current transcript at the time of speech end */
+  currentTranscript: string;
+  /** Current interim transcript at the time of speech end */
+  currentInterimTranscript: string;
+  /** Current audio metrics at the time of speech end */
   currentAudioMetrics: AudioMetrics;
 }
