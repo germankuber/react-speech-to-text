@@ -241,6 +241,56 @@
             transition: width 0.1s ease;
             border-radius: 2px;
         }
+        .silence-countdown {
+            background: white;
+            border: 2px solid #dc3545;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .countdown-bar {
+            height: 25px;
+            background: #e9ecef;
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+            margin: 10px 0;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .countdown-progress {
+            height: 100%;
+            border-radius: 12px;
+            transition: width 0.05s linear, background-color 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 14px;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.7);
+            position: relative;
+        }
+        .countdown-progress::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, 
+                rgba(255,255,255,0.2) 0%, 
+                rgba(255,255,255,0) 50%, 
+                rgba(255,255,255,0.2) 100%);
+            border-radius: 12px;
+        }
+        .countdown-pulse {
+            animation: countdownPulse 1s ease-in-out infinite;
+        }
+        @keyframes countdownPulse {
+            0%, 100% { box-shadow: 0 0 5px rgba(220, 53, 69, 0.3); }
+            50% { box-shadow: 0 0 20px rgba(220, 53, 69, 0.6); }
+        }
     </style>
 </head>
 <body>
@@ -287,6 +337,22 @@
 
             <div id="status" class="status not-listening">
                 ⏸️ DETENIDO - Presiona "Iniciar Detección" para comenzar
+            </div>
+
+            <!-- Barra de countdown de silencio - SIEMPRE VISIBLE -->
+            <div id="silenceCountdown" class="silence-countdown" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <h3 id="countdownTitle" style="margin: 0; color: #28a745;">🔄 Esperando actividad de voz</h3>
+                    <span id="timeLeft" style="color: #666; font-weight: bold; font-size: 16px;">LISTO</span>
+                </div>
+                <div class="countdown-bar">
+                    <div id="countdownProgress" class="countdown-progress" style="width: 100%; background-color: #6c757d;">
+                        ESPERANDO
+                    </div>
+                </div>
+                <div id="countdownDescription" style="text-align: center; margin-top: 10px; font-size: 13px; color: #666;">
+                    Cuando dejes de hablar, iniciará el countdown de 3 segundos
+                </div>
             </div>
 
             <div id="metrics" class="metrics" style="display: none;">
@@ -386,6 +452,11 @@
                 this.currentSessionStart = null;
                 this.lastSpeechEnd = 0;
                 
+                // Variables para countdown de silencio
+                this.silenceCountdownInterval = null;
+                this.lastSpeechActivity = 0;
+                this.silenceTimeout = 3000; // 3 segundos
+                
                 this.recognition = null;
                 this.audioContext = null;
                 this.analyser = null;
@@ -421,7 +492,12 @@
                     finalTranscript: document.getElementById('finalTranscript'),
                     interimContainer: document.getElementById('interimContainer'),
                     interimTranscript: document.getElementById('interimTranscript'),
-                    errorContainer: document.getElementById('error-container')
+                    errorContainer: document.getElementById('error-container'),
+                    silenceCountdown: document.getElementById('silenceCountdown'),
+                    timeLeft: document.getElementById('timeLeft'),
+                    countdownProgress: document.getElementById('countdownProgress'),
+                    countdownTitle: document.getElementById('countdownTitle'),
+                    countdownDescription: document.getElementById('countdownDescription')
                 };
             }
             
@@ -491,6 +567,7 @@
                     this.elements.startBtn.disabled = true;
                     this.elements.stopBtn.disabled = false;
                     this.elements.metrics.style.display = 'grid';
+                    this.elements.silenceCountdown.style.display = 'block';
                     
                 } catch (error) {
                     console.error('Error al iniciar detección:', error);
@@ -591,6 +668,11 @@
                         this.currentSessionStart = currentTime;
                         this.speechSegments++;
                         
+                        // Resetear countdown al empezar a hablar
+                        this.lastSpeechActivity = currentTime;
+                        this.stopSilenceCountdown();
+                        this.updateBarVisuals(); // Actualizar visual de la barra
+                        
                         const silenceBeforeSpeech = this.lastSpeechEnd > 0 ? currentTime - this.lastSpeechEnd : 0;
                         this.totalSilenceTime += silenceBeforeSpeech;
                         
@@ -614,13 +696,17 @@
                     const pauseDuration = currentTime - (this.lastVolumeAboveThreshold || currentTime);
                     
                     if (pauseDuration >= this.speechPauseThreshold) {
-                        // Fin de habla
+                        // Fin de habla - iniciar countdown
                         const speechDuration = this.currentSessionStart ? currentTime - this.currentSessionStart : 0;
                         this.totalSpeechTime += speechDuration;
                         this.lastSpeechEnd = currentTime;
+                        this.lastSpeechActivity = currentTime;
                         
                         this.isCurrentlySpeaking = false;
                         this.currentSessionStart = null;
+                        
+                        // Iniciar countdown de silencio
+                        this.startSilenceCountdown();
                         
                         this.addEvent('end', {
                             pauseDuration,
@@ -639,8 +725,106 @@
                     }
                 }
                 
+                // Actualizar visuales de la barra si no hay countdown activo
+                if (!this.silenceCountdownInterval) {
+                    this.updateBarVisuals();
+                }
+                
                 this.updateSessionMetrics();
                 this.updateStatus();
+            }
+            
+            startSilenceCountdown() {
+                this.stopSilenceCountdown();
+                
+                // Actualizar título para countdown activo
+                this.elements.countdownTitle.textContent = '⏱️ Countdown hacia Detección de Silencio';
+                this.elements.countdownTitle.style.color = '#dc3545';
+                this.elements.countdownDescription.textContent = 'Countdown activo - La barra baja hasta llegar a 0%';
+                
+                const updateInterval = 50;
+                
+                this.silenceCountdownInterval = setInterval(() => {
+                    const currentTime = Date.now();
+                    const elapsed = currentTime - this.lastSpeechActivity;
+                    const remaining = Math.max(0, this.silenceTimeout - elapsed);
+                    const percentage = (remaining / this.silenceTimeout) * 100;
+                    
+                    // Actualizar barra
+                    this.elements.countdownProgress.style.width = percentage + '%';
+                    this.elements.countdownProgress.textContent = Math.round(percentage) + '%';
+                    this.elements.timeLeft.textContent = (remaining / 1000).toFixed(1) + 's restantes';
+                    
+                    // Cambiar color según el progreso
+                    let backgroundColor;
+                    if (percentage > 66) {
+                        backgroundColor = '#28a745';
+                    } else if (percentage > 33) {
+                        backgroundColor = '#ffc107';
+                    } else {
+                        backgroundColor = '#dc3545';
+                    }
+                    this.elements.countdownProgress.style.backgroundColor = backgroundColor;
+                    
+                    // Agregar efecto de pulso cuando está cerca del final
+                    if (percentage < 20) {
+                        this.elements.silenceCountdown.classList.add('countdown-pulse');
+                    } else {
+                        this.elements.silenceCountdown.classList.remove('countdown-pulse');
+                    }
+                    
+                    if (remaining <= 0) {
+                        this.stopSilenceCountdown();
+                        this.triggerSilenceDetection();
+                    }
+                }, updateInterval);
+            }
+            
+            stopSilenceCountdown() {
+                if (this.silenceCountdownInterval) {
+                    clearInterval(this.silenceCountdownInterval);
+                    this.silenceCountdownInterval = null;
+                }
+                
+                this.elements.silenceCountdown.classList.remove('countdown-pulse');
+                // NO ocultar la barra, solo actualizar su estado
+                this.updateBarVisuals();
+            }
+            
+            updateBarVisuals() {
+                if (this.isCurrentlySpeaking) {
+                    // Estado: HABLANDO
+                    this.elements.countdownTitle.textContent = '🎤 Hablando - Countdown pausado';
+                    this.elements.countdownTitle.style.color = '#17a2b8';
+                    this.elements.timeLeft.textContent = 'HABLANDO';
+                    this.elements.countdownProgress.style.width = '100%';
+                    this.elements.countdownProgress.style.backgroundColor = '#17a2b8';
+                    this.elements.countdownProgress.textContent = 'HABLANDO';
+                    this.elements.countdownDescription.textContent = 'Hablando - El countdown se pausará hasta que dejes de hablar';
+                } else {
+                    // Estado: ESPERANDO
+                    this.elements.countdownTitle.textContent = '🔄 Esperando actividad de voz';
+                    this.elements.countdownTitle.style.color = '#28a745';
+                    this.elements.timeLeft.textContent = 'LISTO';
+                    this.elements.countdownProgress.style.width = '100%';
+                    this.elements.countdownProgress.style.backgroundColor = '#6c757d';
+                    this.elements.countdownProgress.textContent = 'ESPERANDO';
+                    this.elements.countdownDescription.textContent = 'Cuando dejes de hablar, iniciará el countdown de 3 segundos';
+                }
+            }
+            
+            triggerSilenceDetection() {
+                // Simular detección de silencio final
+                this.addEvent('silence', {
+                    timeSinceLastSpeech: this.silenceTimeout
+                });
+                
+                if (this.realTimeLogging) {
+                    console.log('🔇 SILENCIO DETECTADO:', {
+                        tiempoSinHabla: this.silenceTimeout + 'ms',
+                        timeout: this.silenceTimeout + 'ms'
+                    });
+                }
             }
             
             addEvent(type, data) {
@@ -771,10 +955,14 @@
                     this.audioContext = null;
                 }
                 
+                // Detener countdown de silencio
+                this.stopSilenceCountdown();
+                
                 this.elements.startBtn.disabled = false;
                 this.elements.stopBtn.disabled = true;
                 this.elements.metrics.style.display = 'none';
                 this.elements.volumeLevel.style.width = '0%';
+                this.elements.silenceCountdown.style.display = 'none';
                 
                 this.updateUI();
             }
@@ -783,6 +971,7 @@
                 this.clearEvents();
                 this.elements.finalTranscript.innerHTML = '<span style="color: #999;">Nada transcrito aún...</span>';
                 this.elements.interimContainer.style.display = 'none';
+                this.stopSilenceCountdown();
                 this.resetSession();
                 this.updateUI();
             }

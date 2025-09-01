@@ -15,6 +15,17 @@ const SpeechDetectionExample: React.FC = () => {
         duration?: number;
     }>>([]);
     
+    // Estado para la barra de countdown de silencio
+    const [silenceCountdown, setSilenceCountdown] = useState<{
+        isActive: boolean;
+        percentage: number;
+        timeLeft: number;
+    }>({
+        isActive: false,
+        percentage: 100,
+        timeLeft: 0
+    });
+    
     const [speechSession, setSpeechSession] = useState<{
         isCurrentlySpeaking: boolean;
         currentSessionStart?: number;
@@ -30,6 +41,8 @@ const SpeechDetectionExample: React.FC = () => {
 
     const lastSpeechEndRef = useRef<number>(0);
     const eventIdRef = useRef<number>(0);
+    const silenceCountdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const lastSpeechActivityRef = useRef<number>(0);
 
     const {
         isListening,
@@ -44,10 +57,14 @@ const SpeechDetectionExample: React.FC = () => {
         language: 'es-ES',
         speechVolumeThreshold,
         speechPauseThreshold,
-        silenceTimeout: 2000,
+        silenceTimeout: 3000, // 3 segundos para el countdown
         onSpeechStart: (data: SpeechStartData) => {
             const currentTime = Date.now();
             const eventId = ++eventIdRef.current;
+            
+            // Resetear countdown al empezar a hablar
+            lastSpeechActivityRef.current = currentTime;
+            stopSilenceCountdown();
             
             // Calcular tiempo de silencio antes de empezar a hablar
             const silenceDuration = lastSpeechEndRef.current > 0 
@@ -85,6 +102,10 @@ const SpeechDetectionExample: React.FC = () => {
             const eventId = ++eventIdRef.current;
             lastSpeechEndRef.current = currentTime;
             
+            // Iniciar countdown de silencio cuando termina la habla
+            lastSpeechActivityRef.current = currentTime;
+            startSilenceCountdown();
+            
             // Calcular duración del segmento de habla
             const speechDuration = speechSession.currentSessionStart 
                 ? currentTime - speechSession.currentSessionStart 
@@ -119,6 +140,9 @@ const SpeechDetectionExample: React.FC = () => {
         onSilenceDetected: (data: SilenceDetectedData) => {
             const eventId = ++eventIdRef.current;
             
+            // Detener countdown al detectar silencio final
+            stopSilenceCountdown();
+            
             setSpeechEvents(prev => [...prev.slice(-19), {
                 id: eventId,
                 type: 'silence',
@@ -135,6 +159,50 @@ const SpeechDetectionExample: React.FC = () => {
         }
     });
 
+    // Funciones para manejar el countdown de silencio
+    const startSilenceCountdown = () => {
+        stopSilenceCountdown(); // Limpiar cualquier countdown anterior
+        
+        const silenceTimeout = 3000; // 3 segundos
+        const updateInterval = 50; // Actualizar cada 50ms para suavidad
+        
+        setSilenceCountdown({
+            isActive: true,
+            percentage: 100,
+            timeLeft: silenceTimeout
+        });
+        
+        silenceCountdownIntervalRef.current = setInterval(() => {
+            const currentTime = Date.now();
+            const elapsed = currentTime - lastSpeechActivityRef.current;
+            const remaining = Math.max(0, silenceTimeout - elapsed);
+            const percentage = (remaining / silenceTimeout) * 100;
+            
+            setSilenceCountdown({
+                isActive: remaining > 0,
+                percentage: Math.round(percentage),
+                timeLeft: remaining
+            });
+            
+            if (remaining <= 0) {
+                stopSilenceCountdown();
+            }
+        }, updateInterval);
+    };
+    
+    const stopSilenceCountdown = () => {
+        if (silenceCountdownIntervalRef.current) {
+            clearInterval(silenceCountdownIntervalRef.current);
+            silenceCountdownIntervalRef.current = null;
+        }
+        
+        setSilenceCountdown({
+            isActive: false,
+            percentage: 100, // Mantener al 100% cuando no está activo
+            timeLeft: 0
+        });
+    };
+
     // Limpiar eventos cuando se para la escucha
     useEffect(() => {
         if (!isListening) {
@@ -145,7 +213,13 @@ const SpeechDetectionExample: React.FC = () => {
                 speechSegments: 0
             });
             lastSpeechEndRef.current = 0;
+            stopSilenceCountdown();
         }
+        
+        // Cleanup al desmontar componente
+        return () => {
+            stopSilenceCountdown();
+        };
     }, [isListening]);
 
     const styles = {
@@ -259,6 +333,33 @@ const SpeechDetectionExample: React.FC = () => {
             backgroundColor: '#f8d7da',
             color: '#721c24',
             border: '1px solid #f5c6cb'
+        },
+        silenceCountdownContainer: {
+            backgroundColor: '#fff',
+            border: '2px solid #dc3545',
+            borderRadius: '10px',
+            padding: '15px',
+            marginBottom: '20px'
+        },
+        silenceCountdownBar: {
+            height: '20px',
+            backgroundColor: '#e9ecef',
+            borderRadius: '10px',
+            overflow: 'hidden',
+            position: 'relative' as const,
+            marginTop: '10px'
+        },
+        silenceCountdownProgress: {
+            height: '100%',
+            transition: 'width 0.05s linear',
+            borderRadius: '10px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'white',
+            fontWeight: 'bold',
+            fontSize: '12px',
+            textShadow: '0 1px 2px rgba(0,0,0,0.5)'
         }
     };
 
@@ -351,6 +452,55 @@ const SpeechDetectionExample: React.FC = () => {
                     '⏸️ DETENIDO - Presiona "Iniciar" para comenzar la detección'
                 )}
             </div>
+
+            {/* Barra de countdown de silencio - SIEMPRE VISIBLE */}
+            {isListening && (
+                <div style={styles.silenceCountdownContainer}>
+                    <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px'}}>
+                        <h4 style={{margin: 0, color: silenceCountdown.isActive ? '#dc3545' : '#28a745'}}>
+                            {silenceCountdown.isActive ? 
+                                '⏱️ Countdown hacia Detección de Silencio' : 
+                                speechSession.isCurrentlySpeaking ? 
+                                    '🎤 Hablando - Countdown pausado' : 
+                                    '🔄 Esperando actividad de voz'
+                            }
+                        </h4>
+                        <span style={{color: '#666', fontWeight: 'bold'}}>
+                            {silenceCountdown.isActive ? 
+                                `${(silenceCountdown.timeLeft / 1000).toFixed(1)}s restantes` : 
+                                speechSession.isCurrentlySpeaking ? 
+                                    'HABLANDO' : 
+                                    'LISTO'
+                            }
+                        </span>
+                    </div>
+                    <div style={styles.silenceCountdownBar}>
+                        <div 
+                            style={{
+                                ...styles.silenceCountdownProgress,
+                                width: `${silenceCountdown.percentage}%`,
+                                backgroundColor: !silenceCountdown.isActive ? 
+                                    (speechSession.isCurrentlySpeaking ? '#17a2b8' : '#6c757d') :
+                                    silenceCountdown.percentage > 66 ? '#28a745' : 
+                                    silenceCountdown.percentage > 33 ? '#ffc107' : '#dc3545'
+                            }}
+                        >
+                            {!silenceCountdown.isActive ? 
+                                (speechSession.isCurrentlySpeaking ? 'HABLANDO' : 'ESPERANDO') :
+                                `${silenceCountdown.percentage}%`
+                            }
+                        </div>
+                    </div>
+                    <div style={{textAlign: 'center', marginTop: '8px', fontSize: '12px', color: '#666'}}>
+                        {silenceCountdown.isActive ? 
+                            'Countdown activo - La barra baja hasta llegar a 0%' :
+                            speechSession.isCurrentlySpeaking ?
+                                'Hablando - El countdown se pausará hasta que dejes de hablar' :
+                                'Cuando dejes de hablar, iniciará el countdown de 3 segundos'
+                        }
+                    </div>
+                </div>
+            )}
 
             {isListening && (
                 <div style={styles.metricsSection}>
