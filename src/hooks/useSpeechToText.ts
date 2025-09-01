@@ -19,12 +19,11 @@ interface UseSpeechToTextReturn {
   interimTranscript: string;
   isSupported: boolean;
   silenceDetected: boolean;
+  silenceCountdown: number; // Tiempo restante en ms hasta que se active el silenceTimeout
   sessionMetadata: SessionMetadata | null;
   audioMetrics: AudioMetrics;
   chartData: ChartData;
   toggleListening: () => Promise<void>;
-  onVoiceStart: () => Promise<void>;
-  onVoiceStop: () => Promise<void>;
   clearTranscript: () => void;
   copyMetadataToClipboard: () => Promise<{ success: boolean; message: string }>;
 }
@@ -44,11 +43,13 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
   const [interimTranscript, setInterimTranscript] = useState('');
   const [isSupported, setIsSupported] = useState(false);
   const [silenceDetected, setSilenceDetected] = useState(false);
+  const [silenceCountdown, setSilenceCountdown] = useState(0);
   const [sessionMetadata, setSessionMetadata] = useState<SessionMetadata | null>(null);
   const [, forceUpdate] = useState(0);
 
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastSpeechTimeRef = useRef<number>(0);
   const currentWordsRef = useRef<string[]>([]);
   const uiUpdateIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -94,11 +95,30 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
     if (finalTranscript || interimTranscript) {
       lastSpeechTimeRef.current = Date.now();
       setSilenceDetected(false);
+      setSilenceCountdown(silenceTimeout); // Inicializar el contador
 
-      // Clear existing timer
+      // Clear existing timers
       if (silenceTimerRef.current) {
         clearTimeout(silenceTimerRef.current);
       }
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+      }
+
+      // Start countdown interval
+      countdownIntervalRef.current = setInterval(() => {
+        const elapsed = Date.now() - lastSpeechTimeRef.current;
+        const remaining = Math.max(0, silenceTimeout - elapsed);
+        setSilenceCountdown(remaining);
+
+        // Si llegamos a 0, limpiar el intervalo
+        if (remaining <= 0) {
+          if (countdownIntervalRef.current) {
+            clearInterval(countdownIntervalRef.current);
+            countdownIntervalRef.current = null;
+          }
+        }
+      }, 50); // Actualizar cada 50ms para suavidad
 
       // Set new silence timer
       silenceTimerRef.current = setTimeout(() => {
@@ -106,6 +126,13 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
         const timeSinceLastSpeech = silenceDetectedAt - lastSpeechTimeRef.current;
 
         setSilenceDetected(true);
+        setSilenceCountdown(0);
+
+        // Clear countdown interval
+        if (countdownIntervalRef.current) {
+          clearInterval(countdownIntervalRef.current);
+          countdownIntervalRef.current = null;
+        }
 
         // Call the onSpeechCompleted callback if provided
         if (onSpeechCompleted) {
@@ -136,6 +163,13 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
           }, 200);
         }
       }, silenceTimeout);
+    } else {
+      // Si no hay transcript, resetear contador
+      setSilenceCountdown(0);
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      }
     }
 
     if (finalTranscript) {
@@ -269,6 +303,10 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
         clearTimeout(silenceTimerRef.current);
         silenceTimerRef.current = null;
       }
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      }
       if (uiUpdateIntervalRef.current) {
         clearInterval(uiUpdateIntervalRef.current);
         uiUpdateIntervalRef.current = null;
@@ -323,55 +361,13 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
     }
   }, [isListening, stopAudioAnalysis, generateMetadata, initializeAudioAnalysis, audioConfig]);
 
-  const onVoiceStart = useCallback(async () => {
-    if (!recognitionRef.current || isListening) return;
-
-    setSilenceDetected(false);
-    setSessionMetadata(null);
-    currentWordsRef.current.length = 0;
-    transcriptRef.current = '';
-    interimTranscriptRef.current = '';
-    lastSpeechTimeRef.current = Date.now();
-
-    try {
-      await initializeAudioAnalysis(audioConfig);
-      recognitionRef.current.start();
-
-      uiUpdateIntervalRef.current = setInterval(() => {
-        if (isListening) {
-          forceUpdate(prev => prev + 1);
-        }
-      }, 100);
-
-    } catch (error) {
-      console.error('Error starting speech recognition:', error);
-      setIsListening(false);
-      setSilenceDetected(false);
-    }
-  }, [isListening, initializeAudioAnalysis, audioConfig]);
-
-  const onVoiceStop = useCallback(async () => {
-    if (!recognitionRef.current || !isListening) return;
-
-    recognitionRef.current.stop();
-
-    if (uiUpdateIntervalRef.current) {
-      clearInterval(uiUpdateIntervalRef.current);
-      uiUpdateIntervalRef.current = null;
-    }
-
-    setTimeout(() => {
-      stopAudioAnalysis();
-      setSessionMetadata(generateMetadata());
-    }, 100);
-  }, [isListening, stopAudioAnalysis, generateMetadata]);
-
   const clearTranscript = useCallback(() => {
     setTranscript('');
     setInterimTranscript('');
     transcriptRef.current = '';
     interimTranscriptRef.current = '';
     setSilenceDetected(false);
+    setSilenceCountdown(0);
     setSessionMetadata(null);
     currentWordsRef.current.length = 0; // Efficient array clearing
 
@@ -379,6 +375,12 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
     if (uiUpdateIntervalRef.current) {
       clearInterval(uiUpdateIntervalRef.current);
       uiUpdateIntervalRef.current = null;
+    }
+
+    // Clear countdown interval if running
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current);
+      countdownIntervalRef.current = null;
     }
 
     clearAudioData();
@@ -406,12 +408,11 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
     interimTranscript,
     isSupported,
     silenceDetected,
+    silenceCountdown,
     sessionMetadata,
     audioMetrics,
     chartData,
     toggleListening,
-    onVoiceStart,
-    onVoiceStop,
     clearTranscript,
     copyMetadataToClipboard
   };

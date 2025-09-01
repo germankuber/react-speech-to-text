@@ -3,28 +3,26 @@ import { useSpeechToText } from '../../../src/hooks/useSpeechToText';
 import { PerformanceMode } from '../../../src/types/speechToText';
 
 const VolumeVisualizer: React.FC = () => {
+    // Configuration constants
+    const SILENCE_TIMEOUT = 1500; // milliseconds
+    
     const {
         isListening,
         audioMetrics,
         toggleListening,
         isSupported,
         silenceDetected,
+        silenceCountdown,
     } = useSpeechToText({
         language: 'es-ES',
         speechVolumeThreshold: 3,
-        speechPauseThreshold: 200,
+        silenceTimeout: SILENCE_TIMEOUT,
         performanceMode: PerformanceMode.SPEED,
         onError: (error) => {
             console.error('🚨 Speech-to-text error:', error);
         },
         onSpeechCompleted: (data) => {
             console.log('🤫 Speech completed:', data);
-        },
-        onVoiceStart: () => {
-            console.log('🎤 Voice started');
-        },
-        onVoiceStop: () => {
-            console.log('🎤 Voice stopped');
         },
         audioConfig: {
             echoCancellation: false,
@@ -184,6 +182,35 @@ const VolumeVisualizer: React.FC = () => {
                                         </span>
                                     </div>
                                 </div>
+
+                                {/* Silence Countdown Timer */}
+                                {isListening && silenceCountdown > 0 && (
+                                    <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
+                                        <div className="flex items-center justify-between mb-3">
+                                            <span className="text-sm font-medium text-amber-800">Silence Timer</span>
+                                            <span className="text-xs text-amber-600 font-mono">
+                                                {(silenceCountdown / 1000).toFixed(1)}s
+                                            </span>
+                                        </div>
+                                        
+                                        {/* Progress Bar */}
+                                        <div className="w-full bg-amber-200 rounded-full h-2 mb-2">
+                                            <div 
+                                                className="bg-amber-500 h-2 rounded-full transition-all duration-75 ease-linear"
+                                                style={{ 
+                                                    width: `${Math.max(0, (silenceCountdown / SILENCE_TIMEOUT) * 100)}%` 
+                                                }}
+                                            ></div>
+                                        </div>
+                                        
+                                        <div className="flex items-center space-x-2 text-amber-700">
+                                            <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></div>
+                                            <span className="text-xs font-medium">
+                                                Speech will stop in {Math.ceil(silenceCountdown / 1000)} seconds
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
