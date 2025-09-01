@@ -1,13 +1,17 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App';
+import TestApp from './TestApp';
+
+console.log('index.tsx: Iniciando aplicación');
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
 );
 
+console.log('index.tsx: Root creado, renderizando...');
+
 root.render(
   <React.StrictMode>
-    <App />
+    <TestApp />
   </React.StrictMode>
 );

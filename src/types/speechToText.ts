@@ -197,6 +197,12 @@ export interface SpeechToTextConfig {
    * @default 200
    */
   speechPauseThreshold?: number;
+  
+  /**
+   * Callback function triggered when a speech recognition error occurs
+   * Provides detailed information about the error for custom handling
+   */
+  onError?: (data: SpeechErrorData) => void;
 }
 
 /**
@@ -279,4 +285,26 @@ export interface SpeechEndData {
   currentInterimTranscript: string;
   /** Current audio metrics at the time of speech end */
   currentAudioMetrics: AudioMetrics;
+}
+
+/**
+ * Data provided when a speech recognition error occurs
+ */
+export interface SpeechErrorData {
+  /** Timestamp when the error occurred (milliseconds since epoch) */
+  errorOccurredAt: number;
+  /** The error type from the SpeechRecognitionErrorEvent */
+  errorType: string;
+  /** The error message from the SpeechRecognitionErrorEvent */
+  errorMessage: string;
+  /** Whether this is a critical error that stops recognition */
+  isCritical: boolean;
+  /** Current transcript at the time of error */
+  currentTranscript: string;
+  /** Current interim transcript at the time of error */
+  currentInterimTranscript: string;
+  /** Current audio metrics at the time of error */
+  currentAudioMetrics: AudioMetrics;
+  /** Whether the hook will attempt to restart recognition automatically */
+  willAttemptRestart: boolean;
 }

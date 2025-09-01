@@ -10,7 +10,8 @@ import {
   PerformanceMode,
   SilenceDetectedData,
   SpeechStartData,
-  SpeechEndData
+  SpeechEndData,
+  SpeechErrorData
 } from '../types/speechToText';
 import { useAudioAnalysis } from './useAudioAnalysis';
 import { generateSessionMetadata, generateChartData } from '../utils/speechToTextUtils';
@@ -41,6 +42,7 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
     onSilenceDetected,
     onSpeechStart,
     onSpeechEnd,
+    onError,
     speechVolumeThreshold = 15,
     speechPauseThreshold = 200
   } = config;
@@ -290,21 +292,29 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
     };
 
     const handleError = (event: SpeechRecognitionErrorEvent) => {
+      const currentTime = Date.now();
+      let isCritical = true;
+      let willAttemptRestart = false;
+      
       // Handle specific error types
       switch (event.error) {
         case 'no-speech':
           // This is normal behavior when no speech is detected for ~5 seconds
-          // Don't log as error, just restart recognition if still listening
+          // Don't treat as critical error, just restart recognition if still listening
+          isCritical = false;
           if (isListening && recognitionRef.current) {
+            willAttemptRestart = true;
             try {
               recognitionRef.current.start();
             } catch (e) {
               // If restart fails, then stop listening
+              isCritical = true;
+              willAttemptRestart = false;
               setIsListening(false);
               setInterimTranscript('');
             }
           }
-          return; // Don't treat as error
+          break;
         case 'not-allowed':
           console.error('Microphone access denied. Please allow microphone permissions.');
           break;
@@ -318,13 +328,36 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
           console.error(`Speech recognition error: ${event.error}`);
       }
       
-      // Only stop listening for actual errors (not no-speech)
-      setIsListening(false);
-      setInterimTranscript('');
+      // Create error data for callback
+      const errorData: SpeechErrorData = {
+        errorOccurredAt: currentTime,
+        errorType: event.error,
+        errorMessage: event.message || `Speech recognition error: ${event.error}`,
+        isCritical,
+        currentTranscript: transcript,
+        currentInterimTranscript: interimTranscript,
+        currentAudioMetrics: audioMetrics,
+        willAttemptRestart
+      };
       
-      if (uiUpdateIntervalRef.current) {
-        clearInterval(uiUpdateIntervalRef.current);
-        uiUpdateIntervalRef.current = null;
+      // Call user's onError callback if provided
+      if (onError) {
+        try {
+          onError(errorData);
+        } catch (callbackError) {
+          console.error('Error in onError callback:', callbackError);
+        }
+      }
+      
+      // Only stop listening for critical errors (not no-speech auto-restarts)
+      if (isCritical && !willAttemptRestart) {
+        setIsListening(false);
+        setInterimTranscript('');
+        
+        if (uiUpdateIntervalRef.current) {
+          clearInterval(uiUpdateIntervalRef.current);
+          uiUpdateIntervalRef.current = null;
+        }
       }
     };
 
