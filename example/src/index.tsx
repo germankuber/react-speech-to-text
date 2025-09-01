@@ -1,17 +1,17 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import TestApp from './TestApp';
+import SpeechDetectionDemo from './SpeechDetectionDemo';
 
-console.log('index.tsx: Iniciando aplicación');
+console.log('index.tsx: Iniciando aplicación Speech Detection Demo');
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
 );
 
-console.log('index.tsx: Root creado, renderizando...');
+console.log('index.tsx: Root creado, renderizando SpeechDetectionDemo...');
 
 root.render(
   <React.StrictMode>
-    <TestApp />
+    <SpeechDetectionDemo />
   </React.StrictMode>
 );
