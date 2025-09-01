@@ -1,0 +1,24 @@
+{
+  "name": "react-speech-to-text-examples",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Examples for react-speech-to-text-gk package",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-speech-to-text-gk": "file:.."
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.24",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^4.2.1",
+    "typescript": "^4.9.5",
+    "vite": "^5.0.0"
+  }
+}
