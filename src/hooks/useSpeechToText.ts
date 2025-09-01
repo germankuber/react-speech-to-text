@@ -389,7 +389,11 @@ export const useSpeechToText = (config: SpeechToTextConfig = {}): UseSpeechToTex
       isSpeakingRef.current = false;
       lastVolumeAboveThresholdRef.current = 0;
       speechStartTimeRef.current = 0;
-      stopAudioAnalysis();
+      // Only stop audio analysis if we're actually listening
+      // This prevents React strict mode from stopping audio analysis during development
+      if (isListening) {
+        stopAudioAnalysis();
+      }
     };
   }, [language, optimizedMode, processTranscript, stopAudioAnalysis, handleSpeechDetection]);
 

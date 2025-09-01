@@ -1,5 +1,5 @@
-import { useRef, useCallback, useMemo } from 'react';
 import { PitchDetector } from 'pitchy';
+import { useCallback, useMemo, useRef } from 'react';
 import { AudioMetrics, PerformanceMode } from '../types/speechToText';
 
 // Optimized autocorrelation with early termination and stride optimization
@@ -99,7 +99,9 @@ export const useAudioAnalysis = (performanceMode: PerformanceMode = PerformanceM
   }), []);
 
   const analyzeAudio = useCallback(() => {
-    if (!analyserRef.current || !isMonitoringRef.current || !audioContextRef.current) return;
+    if (!analyserRef.current || !isMonitoringRef.current || !audioContextRef.current) {
+      return;
+    }
 
     const bufferLength = analyserRef.current.frequencyBinCount;
     const sampleRate = audioContextRef.current.sampleRate;
@@ -216,12 +218,16 @@ export const useAudioAnalysis = (performanceMode: PerformanceMode = PerformanceM
   }, [config, volumeConstants]);
 
   const startVolumeMonitoring = useCallback(() => {
-    if (!analyserRef.current) return;
+    if (!analyserRef.current) {
+      return;
+    }
     
     const updateFrequency = 1000 / config.updateFreq;
 
     // Simplified monitoring with single timer
-    if (analysisIntervalRef.current) clearInterval(analysisIntervalRef.current);
+    if (analysisIntervalRef.current) {
+      clearInterval(analysisIntervalRef.current);
+    }
     
     analysisIntervalRef.current = setInterval(() => {
       if (!isMonitoringRef.current) {

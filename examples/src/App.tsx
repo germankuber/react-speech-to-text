@@ -1,72 +1,86 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useSpeechToText } from '../../src/hooks/useSpeechToText';
 import { PerformanceMode } from '../../src/types/speechToText';
 import './App.css';
 
 const App: React.FC = () => {
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const speakingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const {
     isListening,
     audioMetrics,
     startListening,
     stopListening,
+    toggleListening,
     isSupported,
     transcript,
     interimTranscript
   } = useSpeechToText({
     language: 'es-ES',
-    speechVolumeThreshold: 10, // Umbral más bajo para detectar habla
-    speechPauseThreshold: 150, // Pausa más corta para detectar fin de habla
+    speechVolumeThreshold: 3, // Umbral muy bajo
+    speechPauseThreshold: 200, 
     performanceMode: PerformanceMode.SPEED,
     onVoiceStart: (data) => {
-      console.log('🎤 Empezaste a hablar', data);
-      setIsSpeaking(true);
+      console.log('🎤 CALLBACK VOLUMEN: Empezaste a hablar', data);
+      console.log('Volumen que activó:', data.triggerVolume);
     },
     onVoiceStop: (data) => {
-      console.log('🔇 Dejaste de hablar', data);
-      setIsSpeaking(false);
+      console.log('🔇 CALLBACK VOLUMEN: Dejaste de hablar', data);
+      console.log('Duración de pausa:', data.pauseDuration);
+    },
+    onSpeechCompleted: (data) => {
+      console.log('✅ CALLBACK: Reconocimiento de voz completado', data);
+      console.log('Tiempo:', new Date().toLocaleTimeString());
     },
     onError: (error) => {
-      console.error('Error:', error);
+      console.error('❌ Error:', error);
     }
   });
 
-  // Detectar habla basado en el volumen directamente como backup
+  // Sistema similar a speechCompleted pero para detectar habla basado en transcript
   useEffect(() => {
-    if (isListening) {
-      const interval = setInterval(() => {
-        if (audioMetrics.currentVolume > 10) {
-          if (!isSpeaking) {
-            setIsSpeaking(true);
-          }
-        } else {
-          if (isSpeaking) {
-            // Pequeño delay antes de marcar como no hablando
-            setTimeout(() => {
-              if (audioMetrics.currentVolume <= 10) {
-                setIsSpeaking(false);
-              }
-            }, 200);
-          }
-        }
-      }, 100);
-
-      return () => clearInterval(interval);
+    if (transcript || interimTranscript) {
+      // Si no estaba hablando, marca como hablando
+      if (!isSpeaking) {
+        console.log('🎤 TRANSCRIPT: Empezaste a hablar');
+        console.log('Transcript:', transcript);
+        console.log('Interim:', interimTranscript);
+        console.log('Tiempo:', new Date().toLocaleTimeString());
+        setIsSpeaking(true);
+      }
+      
+      // Limpiar timeout anterior
+      if (speakingTimeoutRef.current) {
+        clearTimeout(speakingTimeoutRef.current);
+      }
+      
+      // Establecer nuevo timeout para detectar fin de habla
+      speakingTimeoutRef.current = setTimeout(() => {
+        console.log('🔇 TRANSCRIPT: Dejaste de hablar (silencio detectado)');
+        console.log('Tiempo:', new Date().toLocaleTimeString());
+        setIsSpeaking(false);
+      }, 500); // 500ms sin nuevo transcript = dejó de hablar
     }
-  }, [isListening, audioMetrics.currentVolume, isSpeaking]);
+  }, [transcript, interimTranscript, isSpeaking]);
 
   const handleToggle = async () => {
-    try {
-      if (isListening) {
-        await stopListening();
-        setIsSpeaking(false);
-      } else {
-        await startListening();
-      }
-    } catch (error) {
-      console.error('Error al cambiar estado:', error);
-    }
+    toggleListening()
+    // try {
+    //   if (isListening) {
+    //     console.log('🛑 Deteniendo...');
+    //     await stopListening();
+    //     setIsSpeaking(false);
+    //     if (speakingTimeoutRef.current) {
+    //       clearTimeout(speakingTimeoutRef.current);
+    //     }
+    //   } else {
+    //     console.log('▶️ Iniciando...');
+    //     await startListening();
+    //   }
+    // } catch (error) {
+    //   console.error('Error al cambiar estado:', error);
+    // }
   };
 
   if (!isSupported) {
@@ -133,6 +147,25 @@ const App: React.FC = () => {
             </span>
           </div>
 
+          <div className="metric-item">
+            <span className="metric-label">Umbral configurado:</span>
+            <span className="metric-value">3%</span>
+          </div>
+
+          <div className="metric-item">
+            <span className="metric-label">Volumen {'>'}  Umbral:</span>
+            <span className="metric-value" style={{ color: audioMetrics.currentVolume > 3 ? '#4CAF50' : '#f44336' }}>
+              {audioMetrics.currentVolume > 3 ? 'SÍ' : 'NO'}
+            </span>
+          </div>
+
+          <div className="metric-item">
+            <span className="metric-label">Hay Transcript:</span>
+            <span className="metric-value" style={{ color: (transcript || interimTranscript) ? '#4CAF50' : '#f44336' }}>
+              {(transcript || interimTranscript) ? 'SÍ' : 'NO'}
+            </span>
+          </div>
+
           {audioMetrics.currentPitch > 0 && (
             <div className="metric-item">
               <span className="metric-label">Tono:</span>
@@ -160,14 +193,13 @@ const App: React.FC = () => {
         </div>
 
         <div className="instructions">
-          <h3>📋 Instrucciones:</h3>
+          <h3>📋 Cómo funciona:</h3>
           <ul>
-            <li>Haz clic en "Iniciar" para empezar (permite el micrófono cuando te lo pida)</li>
-            <li>Habla normalmente y verás el indicador cambiar a "HABLANDO"</li>
-            <li>El texto que digas aparecerá en la caja de texto</li>
-            <li>Cuando dejes de hablar, volverá a "SILENCIO"</li>
-            <li>El volumen se muestra en tiempo real</li>
-            <li>Haz clic en "Detener" para parar completamente</li>
+            <li><strong>Sistema de detección por TRANSCRIPT:</strong> Detecta habla cuando hay texto reconocido</li>
+            <li><strong>Sistema de detección por VOLUMEN:</strong> Detecta habla cuando el volumen supera 3%</li>
+            <li>Abre la <strong>Consola del navegador (F12)</strong> para ver todos los logs</li>
+            <li>El indicador "HABLANDO" se basa en el sistema de transcript</li>
+            <li>Si no funciona el volumen, el transcript siempre funciona</li>
           </ul>
         </div>
       </div>
