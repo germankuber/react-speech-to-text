@@ -136,21 +136,6 @@ export const useAudioAnalysis = (performanceMode: PerformanceMode = PerformanceM
     const finalVolumeDB = isFinite(rawVolumeDB) ? 
       Math.max(0, Math.round((rawVolumeDB + volumeConstants.dbOffset) * 100) / 100) : 0;
 
-    // Debug log for volume calculation
-    if (Math.random() < 0.05) { // 5% chance to avoid spam
-      console.log('🔊 Volume Debug:', {
-        averageLevel,
-        voiceAverage,
-        rms,
-        freqVolumeDB,
-        rmsVolumeDB,
-        rawVolumeDB,
-        finalVolumeDB,
-        dbOffset: volumeConstants.dbOffset,
-        uiScale: volumeConstants.uiScale
-      });
-    }
-
     // Pitch detection with conditional processing
     let pitchHz = 0;
     if (pitchDetectorRef.current && finalVolumeDB > 1) { // Early exit for low volume
@@ -248,10 +233,8 @@ export const useAudioAnalysis = (performanceMode: PerformanceMode = PerformanceM
   }, [analyzeAudio, config.updateFreq]);
 
   const initializeAudioAnalysis = useCallback(async (audioConfig = {}) => {
-    console.log('🔧 InitializeAudioAnalysis called with config:', audioConfig);
     try {
       // Stream acquisition with optimized constraints
-      console.log('📡 Requesting getUserMedia...');
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           echoCancellation: false,
@@ -260,7 +243,6 @@ export const useAudioAnalysis = (performanceMode: PerformanceMode = PerformanceM
           ...audioConfig
         } 
       });
-      console.log('✅ getUserMedia successful, got stream:', !!stream);
       mediaStreamRef.current = stream;
       
       // Audio context setup
@@ -291,11 +273,9 @@ export const useAudioAnalysis = (performanceMode: PerformanceMode = PerformanceM
       sessionStartTimeRef.current = Date.now();
       
       isMonitoringRef.current = true;
-      console.log('🚀 Starting volume monitoring...');
       startVolumeMonitoring();
-      console.log('🎉 Audio analysis initialization complete!');
     } catch (error) {
-      console.error('🚨 Error in initializeAudioAnalysis:', error);
+      console.error('Error accessing microphone:', error);
       throw error;
     }
   }, [startVolumeMonitoring, config.fftSize]);
