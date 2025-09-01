@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { useSpeechToText } from '../../../src/hooks/useSpeechToText';
 import { PerformanceMode } from '../../../src/types/speechToText';
 
@@ -20,40 +20,46 @@ const VolumeVisualizer: React.FC = () => {
         onSpeechCompleted: (data) => {
             console.log('🤫 Speech completed:', data);
         },
+        onVoiceStart: () => {
+            console.log('🎤 Voice started');
+        },
+        onVoiceStop: () => {
+            console.log('🎤 Voice stopped');
+        },
         audioConfig: {
             echoCancellation: false,
             noiseSuppression: false,
             autoGainControl: false
         }
     });
-    useEffect(() => {
-        console.log('🔊 Audio Metrics Updated:', {
-            currentVolume: audioMetrics.currentVolume,
-            currentPitch: audioMetrics.currentPitch,
-            currentSpectralCentroid: audioMetrics.currentSpectralCentroid,
-            volumeDataLength: audioMetrics.volumeData.length,
-            pitchDataLength: audioMetrics.pitchData.length
-        });
-        console.log('🎤 isListening:', isListening);
-        
-        if (isListening && audioMetrics.currentVolume === 0) {
-            console.warn('⚠️ Audio listening but no volume detected - check microphone permissions');
-            
-            // Check microphone permissions
-            navigator.permissions?.query({name: 'microphone'}).then(result => {
-                console.log('🔒 Microphone permission status:', result.state);
-            }).catch(e => console.log('Could not check permissions:', e));
-            
-            // Check available audio devices
-            navigator.mediaDevices.enumerateDevices().then(devices => {
-                const audioInputs = devices.filter(device => device.kind === 'audioinput');
-                console.log('🎙️ Available audio input devices:', audioInputs.length);
-                audioInputs.forEach((device, i) => {
-                    console.log(`   ${i + 1}. ${device.label || 'Unknown device'}`);
-                });
-            }).catch(e => console.log('Could not enumerate devices:', e));
-        }
-    }, [audioMetrics, isListening]);
+    // useEffect(() => {
+    //     console.log('🔊 Audio Metrics Updated:', {
+    //         currentVolume: audioMetrics.currentVolume,
+    //         currentPitch: audioMetrics.currentPitch,
+    //         currentSpectralCentroid: audioMetrics.currentSpectralCentroid,
+    //         volumeDataLength: audioMetrics.volumeData.length,
+    //         pitchDataLength: audioMetrics.pitchData.length
+    //     });
+    //     console.log('🎤 isListening:', isListening);
+
+    //     if (isListening && audioMetrics.currentVolume === 0) {
+    //         console.warn('⚠️ Audio listening but no volume detected - check microphone permissions');
+
+    //         // Check microphone permissions
+    //         navigator.permissions?.query({name: 'microphone'}).then(result => {
+    //             console.log('🔒 Microphone permission status:', result.state);
+    //         }).catch(e => console.log('Could not check permissions:', e));
+
+    //         // Check available audio devices
+    //         navigator.mediaDevices.enumerateDevices().then(devices => {
+    //             const audioInputs = devices.filter(device => device.kind === 'audioinput');
+    //             console.log('🎙️ Available audio input devices:', audioInputs.length);
+    //             audioInputs.forEach((device, i) => {
+    //                 console.log(`   ${i + 1}. ${device.label || 'Unknown device'}`);
+    //             });
+    //         }).catch(e => console.log('Could not enumerate devices:', e));
+    //     }
+    // }, [audioMetrics, isListening]);
     if (!isSupported) {
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
@@ -99,8 +105,8 @@ const VolumeVisualizer: React.FC = () => {
                                             toggleListening();
                                         }}
                                         className={`w-full py-4 px-6 rounded-xl font-medium text-white transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-[1.02] ${isListening
-                                                ? 'bg-red-500 hover:bg-red-600'
-                                                : 'bg-blue-600 hover:bg-blue-700'
+                                            ? 'bg-red-500 hover:bg-red-600'
+                                            : 'bg-blue-600 hover:bg-blue-700'
                                             }`}
                                     >
                                         <div className="flex items-center justify-center space-x-2">
@@ -148,17 +154,15 @@ const VolumeVisualizer: React.FC = () => {
                                     <div className="flex items-center justify-between mb-2">
                                         <span className="text-sm font-medium text-slate-700">Microphone</span>
                                     </div>
-                                    <div className={`flex items-center space-x-2 ${
-                                        isListening && audioMetrics.currentVolume > 0 ? 'text-green-600' : 
-                                        isListening && audioMetrics.currentVolume === 0 ? 'text-amber-600' : 'text-slate-400'
-                                    }`}>
-                                        <div className={`w-2 h-2 rounded-full ${
-                                            isListening && audioMetrics.currentVolume > 0 ? 'bg-green-500' : 
-                                            isListening && audioMetrics.currentVolume === 0 ? 'bg-amber-500' : 'bg-slate-400'
-                                        }`}></div>
+                                    <div className={`flex items-center space-x-2 ${isListening && audioMetrics.currentVolume > 0 ? 'text-green-600' :
+                                            isListening && audioMetrics.currentVolume === 0 ? 'text-amber-600' : 'text-slate-400'
+                                        }`}>
+                                        <div className={`w-2 h-2 rounded-full ${isListening && audioMetrics.currentVolume > 0 ? 'bg-green-500' :
+                                                isListening && audioMetrics.currentVolume === 0 ? 'bg-amber-500' : 'bg-slate-400'
+                                            }`}></div>
                                         <span className="text-sm font-medium">
-                                            {isListening && audioMetrics.currentVolume > 0 ? 'Working' : 
-                                             isListening && audioMetrics.currentVolume === 0 ? 'Check permissions' : 'Inactive'}
+                                            {isListening && audioMetrics.currentVolume > 0 ? 'Working' :
+                                                isListening && audioMetrics.currentVolume === 0 ? 'Check permissions' : 'Inactive'}
                                         </span>
                                     </div>
                                 </div>
@@ -168,17 +172,15 @@ const VolumeVisualizer: React.FC = () => {
                                     <div className="flex items-center justify-between mb-2">
                                         <span className="text-sm font-medium text-slate-700">Speech Detection</span>
                                     </div>
-                                    <div className={`flex items-center space-x-2 ${
-                                        isListening && !silenceDetected ? 'text-green-600' : 
-                                        isListening && silenceDetected ? 'text-blue-600' : 'text-slate-400'
-                                    }`}>
-                                        <div className={`w-2 h-2 rounded-full ${
-                                            isListening && !silenceDetected ? 'bg-green-500 animate-pulse' : 
-                                            isListening && silenceDetected ? 'bg-blue-500' : 'bg-slate-400'
-                                        }`}></div>
+                                    <div className={`flex items-center space-x-2 ${isListening && !silenceDetected ? 'text-green-600' :
+                                            isListening && silenceDetected ? 'text-blue-600' : 'text-slate-400'
+                                        }`}>
+                                        <div className={`w-2 h-2 rounded-full ${isListening && !silenceDetected ? 'bg-green-500 animate-pulse' :
+                                                isListening && silenceDetected ? 'bg-blue-500' : 'bg-slate-400'
+                                            }`}></div>
                                         <span className="text-sm font-medium">
-                                            {isListening && !silenceDetected ? 'Speaking' : 
-                                             isListening && silenceDetected ? 'Silence detected' : 'Inactive'}
+                                            {isListening && !silenceDetected ? 'Speaking' :
+                                                isListening && silenceDetected ? 'Silence detected' : 'Inactive'}
                                         </span>
                                     </div>
                                 </div>
@@ -216,9 +218,9 @@ const VolumeVisualizer: React.FC = () => {
                                                     strokeWidth="12"
                                                     fill="transparent"
                                                     className={`transition-all duration-300 ${audioMetrics.currentVolume > 50 ? 'text-red-500' :
-                                                            audioMetrics.currentVolume > 25 ? 'text-amber-500' :
-                                                                audioMetrics.currentVolume > 10 ? 'text-blue-500' :
-                                                                    'text-slate-400'
+                                                        audioMetrics.currentVolume > 25 ? 'text-amber-500' :
+                                                            audioMetrics.currentVolume > 10 ? 'text-blue-500' :
+                                                                'text-slate-400'
                                                         }`}
                                                     strokeDasharray={`${(audioMetrics.currentVolume / 100) * 628} 628`}
                                                     strokeLinecap="round"
@@ -237,9 +239,9 @@ const VolumeVisualizer: React.FC = () => {
                                         <div className="text-center">
                                             <div className="text-sm font-medium text-slate-700 mb-2">Current Level</div>
                                             <div className={`text-sm px-4 py-2 rounded-full font-medium ${audioMetrics.currentVolume > 50 ? 'bg-red-100 text-red-700' :
-                                                    audioMetrics.currentVolume > 25 ? 'bg-amber-100 text-amber-700' :
-                                                        audioMetrics.currentVolume > 10 ? 'bg-blue-100 text-blue-700' :
-                                                            'bg-slate-100 text-slate-600'
+                                                audioMetrics.currentVolume > 25 ? 'bg-amber-100 text-amber-700' :
+                                                    audioMetrics.currentVolume > 10 ? 'bg-blue-100 text-blue-700' :
+                                                        'bg-slate-100 text-slate-600'
                                                 }`}>
                                                 {audioMetrics.currentVolume > 50 ? 'HIGH' :
                                                     audioMetrics.currentVolume > 25 ? 'MEDIUM' :
@@ -258,9 +260,9 @@ const VolumeVisualizer: React.FC = () => {
                                             <div className="w-full bg-slate-200 rounded-full h-4">
                                                 <div
                                                     className={`h-full rounded-full transition-all duration-300 ${audioMetrics.currentVolume > 50 ? 'bg-gradient-to-r from-red-400 to-red-600' :
-                                                            audioMetrics.currentVolume > 25 ? 'bg-gradient-to-r from-amber-400 to-amber-600' :
-                                                                audioMetrics.currentVolume > 10 ? 'bg-gradient-to-r from-blue-400 to-blue-600' :
-                                                                    'bg-gradient-to-r from-slate-300 to-slate-400'
+                                                        audioMetrics.currentVolume > 25 ? 'bg-gradient-to-r from-amber-400 to-amber-600' :
+                                                            audioMetrics.currentVolume > 10 ? 'bg-gradient-to-r from-blue-400 to-blue-600' :
+                                                                'bg-gradient-to-r from-slate-300 to-slate-400'
                                                         }`}
                                                     style={{ width: `${Math.min(audioMetrics.currentVolume, 100)}%` }}
                                                 ></div>
@@ -291,8 +293,8 @@ const VolumeVisualizer: React.FC = () => {
                                                     <div
                                                         key={i}
                                                         className={`w-3 rounded-full transition-all duration-300 ${isListening && Math.random() * 100 < audioMetrics.currentVolume
-                                                                ? 'bg-blue-500'
-                                                                : 'bg-slate-300'
+                                                            ? 'bg-blue-500'
+                                                            : 'bg-slate-300'
                                                             }`}
                                                         style={{
                                                             height: `${isListening ? Math.random() * audioMetrics.currentVolume * 0.7 + 10 : 10}px`
