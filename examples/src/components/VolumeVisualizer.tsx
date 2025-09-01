@@ -8,15 +8,52 @@ const VolumeVisualizer: React.FC = () => {
         audioMetrics,
         toggleListening,
         isSupported,
+        silenceDetected,
     } = useSpeechToText({
         language: 'es-ES',
         speechVolumeThreshold: 3,
         speechPauseThreshold: 200,
         performanceMode: PerformanceMode.SPEED,
+        onError: (error) => {
+            console.error('🚨 Speech-to-text error:', error);
+        },
+        onSpeechCompleted: (data) => {
+            console.log('🤫 Speech completed:', data);
+        },
+        audioConfig: {
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false
+        }
     });
     useEffect(() => {
-        console.log('Audio Metrics Updated:', audioMetrics);
-    }, [audioMetrics]);
+        console.log('🔊 Audio Metrics Updated:', {
+            currentVolume: audioMetrics.currentVolume,
+            currentPitch: audioMetrics.currentPitch,
+            currentSpectralCentroid: audioMetrics.currentSpectralCentroid,
+            volumeDataLength: audioMetrics.volumeData.length,
+            pitchDataLength: audioMetrics.pitchData.length
+        });
+        console.log('🎤 isListening:', isListening);
+        
+        if (isListening && audioMetrics.currentVolume === 0) {
+            console.warn('⚠️ Audio listening but no volume detected - check microphone permissions');
+            
+            // Check microphone permissions
+            navigator.permissions?.query({name: 'microphone'}).then(result => {
+                console.log('🔒 Microphone permission status:', result.state);
+            }).catch(e => console.log('Could not check permissions:', e));
+            
+            // Check available audio devices
+            navigator.mediaDevices.enumerateDevices().then(devices => {
+                const audioInputs = devices.filter(device => device.kind === 'audioinput');
+                console.log('🎙️ Available audio input devices:', audioInputs.length);
+                audioInputs.forEach((device, i) => {
+                    console.log(`   ${i + 1}. ${device.label || 'Unknown device'}`);
+                });
+            }).catch(e => console.log('Could not enumerate devices:', e));
+        }
+    }, [audioMetrics, isListening]);
     if (!isSupported) {
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
@@ -57,7 +94,10 @@ const VolumeVisualizer: React.FC = () => {
                                 {/* Main Control Button */}
                                 <div className="text-center">
                                     <button
-                                        onClick={toggleListening}
+                                        onClick={() => {
+                                            console.log('🎤 Toggle listening clicked, current state:', isListening);
+                                            toggleListening();
+                                        }}
                                         className={`w-full py-4 px-6 rounded-xl font-medium text-white transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-[1.02] ${isListening
                                                 ? 'bg-red-500 hover:bg-red-600'
                                                 : 'bg-blue-600 hover:bg-blue-700'
@@ -99,6 +139,46 @@ const VolumeVisualizer: React.FC = () => {
                                             }`}></div>
                                         <span className="text-sm font-medium">
                                             {audioMetrics.currentVolume > 3 ? 'Above threshold' : 'Below threshold'}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Microphone Status */}
+                                <div className="bg-slate-50 rounded-xl p-4">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="text-sm font-medium text-slate-700">Microphone</span>
+                                    </div>
+                                    <div className={`flex items-center space-x-2 ${
+                                        isListening && audioMetrics.currentVolume > 0 ? 'text-green-600' : 
+                                        isListening && audioMetrics.currentVolume === 0 ? 'text-amber-600' : 'text-slate-400'
+                                    }`}>
+                                        <div className={`w-2 h-2 rounded-full ${
+                                            isListening && audioMetrics.currentVolume > 0 ? 'bg-green-500' : 
+                                            isListening && audioMetrics.currentVolume === 0 ? 'bg-amber-500' : 'bg-slate-400'
+                                        }`}></div>
+                                        <span className="text-sm font-medium">
+                                            {isListening && audioMetrics.currentVolume > 0 ? 'Working' : 
+                                             isListening && audioMetrics.currentVolume === 0 ? 'Check permissions' : 'Inactive'}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Silence Detection Status */}
+                                <div className="bg-slate-50 rounded-xl p-4">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <span className="text-sm font-medium text-slate-700">Speech Detection</span>
+                                    </div>
+                                    <div className={`flex items-center space-x-2 ${
+                                        isListening && !silenceDetected ? 'text-green-600' : 
+                                        isListening && silenceDetected ? 'text-blue-600' : 'text-slate-400'
+                                    }`}>
+                                        <div className={`w-2 h-2 rounded-full ${
+                                            isListening && !silenceDetected ? 'bg-green-500 animate-pulse' : 
+                                            isListening && silenceDetected ? 'bg-blue-500' : 'bg-slate-400'
+                                        }`}></div>
+                                        <span className="text-sm font-medium">
+                                            {isListening && !silenceDetected ? 'Speaking' : 
+                                             isListening && silenceDetected ? 'Silence detected' : 'Inactive'}
                                         </span>
                                     </div>
                                 </div>

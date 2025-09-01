@@ -99,9 +99,7 @@ export const useAudioAnalysis = (performanceMode: PerformanceMode = PerformanceM
   }), []);
 
   const analyzeAudio = useCallback(() => {
-    if (!analyserRef.current || !isMonitoringRef.current || !audioContextRef.current) {
-      return;
-    }
+    if (!analyserRef.current || !isMonitoringRef.current || !audioContextRef.current) return;
 
     const bufferLength = analyserRef.current.frequencyBinCount;
     const sampleRate = audioContextRef.current.sampleRate;
@@ -110,20 +108,8 @@ export const useAudioAnalysis = (performanceMode: PerformanceMode = PerformanceM
     const freqDataArray = new Uint8Array(bufferLength);
     const dataArray = new Uint8Array(bufferLength);
 
-    // Get fresh data from analyzer
+    // Optimized volume calculation with pre-computed ranges
     analyserRef.current.getByteFrequencyData(freqDataArray);
-    analyserRef.current.getByteTimeDomainData(dataArray);
-    
-    // Simple volume calculation using time domain data (more responsive)
-    let sum = 0;
-    for (let i = 0; i < bufferLength; i++) {
-      const sample = (dataArray[i] - 128) / 128;
-      sum += Math.abs(sample);
-    }
-    const averageLevel = sum / bufferLength;
-    const volumePercent = Math.min(100, averageLevel * 200); // Scale to 0-100
-    
-    // Frequency domain volume for comparison
     const voiceRangeStart = Math.floor((config.voiceRange.start / (sampleRate / 2)) * bufferLength);
     const voiceRangeEnd = Math.floor((config.voiceRange.end / (sampleRate / 2)) * bufferLength);
     
@@ -149,6 +135,21 @@ export const useAudioAnalysis = (performanceMode: PerformanceMode = PerformanceM
     const rawVolumeDB = Math.max(freqVolumeDB, rmsVolumeDB);
     const finalVolumeDB = isFinite(rawVolumeDB) ? 
       Math.max(0, Math.round((rawVolumeDB + volumeConstants.dbOffset) * 100) / 100) : 0;
+
+    // Debug log for volume calculation
+    if (Math.random() < 0.05) { // 5% chance to avoid spam
+      console.log('🔊 Volume Debug:', {
+        averageLevel,
+        voiceAverage,
+        rms,
+        freqVolumeDB,
+        rmsVolumeDB,
+        rawVolumeDB,
+        finalVolumeDB,
+        dbOffset: volumeConstants.dbOffset,
+        uiScale: volumeConstants.uiScale
+      });
+    }
 
     // Pitch detection with conditional processing
     let pitchHz = 0;
@@ -230,16 +231,12 @@ export const useAudioAnalysis = (performanceMode: PerformanceMode = PerformanceM
   }, [config, volumeConstants]);
 
   const startVolumeMonitoring = useCallback(() => {
-    if (!analyserRef.current) {
-      return;
-    }
+    if (!analyserRef.current) return;
     
     const updateFrequency = 1000 / config.updateFreq;
 
     // Simplified monitoring with single timer
-    if (analysisIntervalRef.current) {
-      clearInterval(analysisIntervalRef.current);
-    }
+    if (analysisIntervalRef.current) clearInterval(analysisIntervalRef.current);
     
     analysisIntervalRef.current = setInterval(() => {
       if (!isMonitoringRef.current) {
@@ -251,8 +248,10 @@ export const useAudioAnalysis = (performanceMode: PerformanceMode = PerformanceM
   }, [analyzeAudio, config.updateFreq]);
 
   const initializeAudioAnalysis = useCallback(async (audioConfig = {}) => {
+    console.log('🔧 InitializeAudioAnalysis called with config:', audioConfig);
     try {
       // Stream acquisition with optimized constraints
+      console.log('📡 Requesting getUserMedia...');
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           echoCancellation: false,
@@ -261,6 +260,7 @@ export const useAudioAnalysis = (performanceMode: PerformanceMode = PerformanceM
           ...audioConfig
         } 
       });
+      console.log('✅ getUserMedia successful, got stream:', !!stream);
       mediaStreamRef.current = stream;
       
       // Audio context setup
@@ -291,9 +291,11 @@ export const useAudioAnalysis = (performanceMode: PerformanceMode = PerformanceM
       sessionStartTimeRef.current = Date.now();
       
       isMonitoringRef.current = true;
+      console.log('🚀 Starting volume monitoring...');
       startVolumeMonitoring();
+      console.log('🎉 Audio analysis initialization complete!');
     } catch (error) {
-      console.error('Error accessing microphone:', error);
+      console.error('🚨 Error in initializeAudioAnalysis:', error);
       throw error;
     }
   }, [startVolumeMonitoring, config.fftSize]);
@@ -349,8 +351,6 @@ export const useAudioAnalysis = (performanceMode: PerformanceMode = PerformanceM
     getSessionStartTime,
     volumeDataRef,
     pitchDataRef,
-    spectralCentroidDataRef,
-    // Add access to last analysis for real-time speech detection
-    getLastAnalysis: () => lastAnalysisRef.current
+    spectralCentroidDataRef
   };
 };
