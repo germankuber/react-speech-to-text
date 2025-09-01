@@ -1,13 +1,52 @@
 import '@testing-library/jest-dom';
 
-// Mock React DOM issue with React 19
+// Fix for React DOM indexOf issue
+Object.defineProperty(String.prototype, 'indexOf', {
+  value: function(searchValue: string, fromIndex?: number) {
+    if (this == null) {
+      return -1;
+    }
+    return String.prototype.indexOf.call(this, searchValue, fromIndex);
+  },
+  writable: true,
+  configurable: true
+});
+
+// Mock React DOM issue with React 18/19
 global.IS_REACT_ACT_ENVIRONMENT = true;
 
-// Fix for React 19 indexOf error
+// Fix for React 18 compatibility issues with testing library
+const originalError = console.error;
+beforeAll(() => {
+  console.error = (...args: any[]) => {
+    if (
+      typeof args[0] === 'string' &&
+      args[0].includes('Warning: ReactDOM.render is no longer supported')
+    ) {
+      return;
+    }
+    originalError.call(console, ...args);
+  };
+});
+
+afterAll(() => {
+  console.error = originalError;
+});
+
+// Fix for React indexOf error and location issues
 if (typeof window !== 'undefined') {
+  // Mock HTMLElement.prototype methods that may be missing
+  if (!HTMLElement.prototype.scrollIntoView) {
+    HTMLElement.prototype.scrollIntoView = jest.fn();
+  }
+  
   Object.defineProperty(window, 'location', {
     value: {
-      ...window.location,
+      href: 'http://localhost/',
+      origin: 'http://localhost',
+      pathname: '/',
+      search: '',
+      hash: '',
       assign: jest.fn(),
       replace: jest.fn(),
       reload: jest.fn(),

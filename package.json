@@ -1,6 +1,6 @@
 {
   "name": "react-speech-to-text-gk",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Advanced React speech-to-text library with real-time audio analysis and comprehensive speech metrics",
   "workspaces": [
     "example"
@@ -55,7 +55,7 @@
     "@rollup/plugin-commonjs": "^25.0.7",
     "@rollup/plugin-node-resolve": "^15.2.3",
     "@rollup/plugin-typescript": "^11.1.5",
-    "@testing-library/react": "^14.3.1",
+    "@testing-library/react": "^13.4.0",
     "@types/jest": "^29.5.14",
     "@types/node": "^16.18.126",
     "@types/react": "^18.3.24",
