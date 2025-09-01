@@ -2,6 +2,7 @@
   "name": "react-speech-to-text-examples",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "description": "Examples for react-speech-to-text-gk package",
   "scripts": {
     "dev": "vite",
@@ -10,6 +11,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@tailwindcss/postcss": "^4.1.12",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-speech-to-text-gk": "file:.."
